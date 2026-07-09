@@ -1,0 +1,18 @@
+# ESP-IDF files
+build/
+sdkconfig
+sdkconfig.old
+sdkconfig.defaults.old
+dependencies.lock
+.ninja_deps
+.ninja_log
+
+# VS Code / IDE settings
+.vscode/
+.settings/
+.project
+.cproject
+
+# OS temporary files
+.DS_Store
+Thumbs.db

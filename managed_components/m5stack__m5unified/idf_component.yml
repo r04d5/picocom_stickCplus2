@@ -1,0 +1,8 @@
+description: Unified library for M5Stack series
+issues: https://github.com/m5stack/M5Unified/issues
+repository: git://github.com/m5stack/M5Unified.git
+repository_info:
+  commit_sha: b1ffcc677014ed8bd01e5a1f240736ae654bfe12
+  path: .
+url: https://github.com/m5stack/M5Unified.git
+version: 0.2.18
