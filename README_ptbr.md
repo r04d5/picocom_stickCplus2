@@ -77,7 +77,7 @@ Ao ligar o dispositivo, ele apresenta o **Menu de Seleção de Modo**. Os contro
 | :--- | :--- | :--- |
 | **Ciclar / Próximo Item** | Clique **Botão A** | Clique **Botão G0** |
 | **Confirmar / Ação** | Clique **Botão B** | Pressione e Segure **Botão G0** |
-| **Abrir/Fechar Menu (Sair)**| Duplo clique **Botão B** | Duplo clique **Botão G0** |
+| **Abrir/Fechar Menu (Sair)**| Clique **Botão Power** (ou duplo clique **Botão B**) | Duplo clique **Botão G0** |
 | **Resetar Terminal/Stats** | Segurar **Botão A** | *(Dbl-clique G0 para sair e reentrar)* |
 
 ---

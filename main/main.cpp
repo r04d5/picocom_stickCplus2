@@ -9,6 +9,7 @@
 #include "fuzzer.h"
 #include "line_monitor.h"
 #include "tester.h"
+#include "keyboard.h"
 #include "ui.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -25,6 +26,9 @@ extern "C" void app_main() {
     // Initialize the terminal buffers with empty strings
     clear_terminal_buffers();
     line_monitor_reset();
+
+    // Bring up the Cardputer matrix keyboard (no-op on other boards).
+    keyboard_init();
 
     // Initialize screen with basic layout
     draw_dashboard_static();
@@ -99,10 +103,26 @@ extern "C" void app_main() {
             select_next_pressed = M5.BtnA.wasClicked();
             confirm_action_pressed = M5.BtnA.wasHold();
         } else {
-            toggle_menu_pressed = M5.BtnB.wasDoubleClicked();
+            toggle_menu_pressed = M5.BtnB.wasDoubleClicked() || M5.BtnPWR.wasClicked();
             select_next_pressed = M5.BtnA.wasClicked();
             confirm_action_pressed = M5.BtnB.wasSingleClicked();
             test_packet_pressed = M5.BtnB.wasHold();
+        }
+
+        // --- Cardputer keyboard input -------------------------------------
+        // Poll once per loop; events are edge-triggered (newly pressed keys).
+        kb_event_t kb_events[16];
+        int kb_n = keyboard_poll(kb_events, 16);
+        bool kb_enter_any = false;
+        for (int k = 0; k < kb_n; k++) {
+            if (kb_events[k].type == KB_ESC) toggle_menu_pressed = true; // ESC = Fn+`
+            else if (kb_events[k].type == KB_ENTER) kb_enter_any = true;
+        }
+        // In terminal/hex the keyboard types onto the wire, so Enter must NOT
+        // double as the confirm/action button there. Everywhere else it does.
+        bool typing_mode = (current_mode == MODE_TEXT_TERMINAL || current_mode == MODE_HEX_VIEWER);
+        if (in_menu || !typing_mode) {
+            confirm_action_pressed = confirm_action_pressed || kb_enter_any;
         }
 
         // Detect open/close menu trigger
@@ -130,6 +150,21 @@ extern "C" void app_main() {
         }
 
         if (in_menu) {
+            // Keyboard directional navigation over the 2-column grid. Arrow
+            // keys (Fn layer) and the bare arrow-legend keys ; . , / both work.
+            for (int k = 0; k < kb_n; k++) {
+                kb_event_t e = kb_events[k];
+                int delta = 0;
+                if (e.type == KB_UP    || (e.type == KB_CHAR && e.ch == ';')) delta = -2;
+                else if (e.type == KB_DOWN  || (e.type == KB_CHAR && e.ch == '.')) delta = +2;
+                else if (e.type == KB_LEFT  || (e.type == KB_CHAR && e.ch == ',')) delta = -1;
+                else if (e.type == KB_RIGHT || (e.type == KB_CHAR && e.ch == '/')) delta = +1;
+                if (delta != 0) {
+                    menu_selection = ((menu_selection + delta) % MENU_ITEMS_COUNT + MENU_ITEMS_COUNT) % MENU_ITEMS_COUNT;
+                    draw_menu();
+                }
+            }
+
             // Menu Navigation
             if (select_next_pressed) {
                 menu_selection = (menu_selection + 1) % MENU_ITEMS_COUNT;
@@ -160,6 +195,27 @@ extern "C" void app_main() {
                 draw_terminal();
             }
         } else {
+            // Cardputer keyboard: in the terminal/hex screens, typed keys are
+            // written straight onto the UART line so the user can drive a
+            // remote shell. Characters echoed back by the target appear via RX.
+            if (typing_mode && kb_n > 0) {
+                bool sent = false;
+                for (int k = 0; k < kb_n; k++) {
+                    char b;
+                    switch (kb_events[k].type) {
+                        case KB_CHAR:      b = kb_events[k].ch; break;
+                        case KB_ENTER:     b = '\r';           break;
+                        case KB_BACKSPACE: b = 0x08;           break;
+                        case KB_TAB:       b = '\t';           break;
+                        default:           continue;
+                    }
+                    uart_write_bytes(UART_NUM_1, &b, 1);
+                    tx_bytes++;
+                    sent = true;
+                }
+                if (sent) draw_dashboard_dynamic();
+            }
+
             // Normal controls in active modes
             // Front Button (BtnA)
             if (select_next_pressed) {

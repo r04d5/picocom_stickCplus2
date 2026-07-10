@@ -77,7 +77,7 @@ Upon boot, the device presents a **Mode Selection Menu**. Controls adapt automat
 | :--- | :--- | :--- |
 | **Cycle / Select Next** | Click **Button A** | Click **Button G0** |
 | **Confirm / Action** | Click **Button B** | Press and Hold **Button G0** |
-| **Open/Close Menu (Exit Mode)**| Double-click **Button B** | Double-click **Button G0** |
+| **Open/Close Menu (Exit Mode)**| Click **Power Button** (or Double-click **Button B**) | Double-click **Button G0** |
 | **Reset Terminal/Stats** | Hold **Button A** | *(Double-click G0 to exit and re-enter)* |
 
 ---
