@@ -35,12 +35,22 @@ uint32_t snap_to_standard_baud(uint32_t calculated) {
     return 0;
 }
 
+#if CONFIG_IDF_TARGET_ESP32
+#define AUTOBAUD_CLK_SRC UART_SCLK_REF_TICK
+#else
+#define AUTOBAUD_CLK_SRC UART_SCLK_RTC
+#endif
+
 uint32_t get_rtc_fast_freq() {
+#if CONFIG_IDF_TARGET_ESP32
+    return 1000000; // REF_TICK on ESP32 is exactly 1 MHz
+#else
     uint32_t clock_hz = 17500000; // standard fallback
     if (esp_clk_tree_src_get_freq_hz((soc_module_clk_t)UART_SCLK_RTC, ESP_CLK_TREE_SRC_FREQ_PRECISION_CACHED, &clock_hz) == ESP_OK) {
         return clock_hz;
     }
     return clock_hz;
+#endif
 }
 
 void start_autobaud_detection() {
@@ -48,7 +58,7 @@ void start_autobaud_detection() {
     uart_rx_enabled = false;
     vTaskDelay(pdMS_TO_TICKS(20));
     
-    // 2. Re-configure UART1 with RTC clock source
+    // 2. Re-configure UART1 with target-specific clock source
     if (uart_is_driver_installed(UART_NUM_1)) {
         uart_driver_delete(UART_NUM_1);
     }
@@ -59,7 +69,7 @@ void start_autobaud_detection() {
     uart_config.parity = UART_PARITY_DISABLE;
     uart_config.stop_bits = UART_STOP_BITS_1;
     uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
-    uart_config.source_clk = UART_SCLK_RTC; // Set clock source to RTC fast clock (~17.5 MHz)
+    uart_config.source_clk = AUTOBAUD_CLK_SRC; // Set target-specific clock source
     uart_config.rx_flow_ctrl_thresh = 122;
     
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
@@ -81,7 +91,7 @@ void start_autobaud_detection() {
     ab_state = AB_STATE_RUNNING;
     ab_detected_baud = 0;
     ab_start_time = xTaskGetTickCount() * portTICK_PERIOD_MS;
-    printf("[AUTOBAUD] Started detection using RTC clock source\n");
+    printf("[AUTOBAUD] Started detection using configured clock source\n");
 }
 
 void stop_autobaud_detection() {
