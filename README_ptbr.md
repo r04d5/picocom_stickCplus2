@@ -155,6 +155,16 @@ Envia payloads deliberadamente malformados ao alvo e observa a vivacidade da lin
 > [!WARNING]
 > O fuzzing pode travar ou corromper o dispositivo alvo. Use apenas em hardware que você possui ou tem autorização para testar.
 
+### 8. Tester (Autoteste)
+Valida cada capacidade de análise **de ponta a ponta pelo UART real**, uma a uma. Transmite um vetor conhecido para cada recurso e verifica se o contador do módulo correspondente reagiu, permitindo confirmar que o pipeline inteiro (UART → fila de RX → Scanner/Analisador de protocolo) está funcionando após um build ou mudança de fiação.
+
+*   **Setup**: os bytes precisam voltar (loopback). Ou ligue **TX no RX do mesmo aparelho** (jumper de loopback: `GPIO32`→`GPIO33` no StickC), ou conecte um **segundo aparelho** rodando o Text Terminal com **ECHO ON** (no mesmo baud rate).
+*   **Confirmar / Ação (Botão B / Segurar G0)**: Roda a sequência de testes. **Ciclar (Botão A)**: Reseta a checklist.
+*   **Checagens** (9): loopback UART, detecção de shell/creds/keys/boot do Scanner, e análise de protocolo para AT `OK`, checksum NMEA válido, checksum NMEA inválido e frame Modbus com CRC válido. Cada linha mostra `PASS` (verde) / `FAIL` (vermelho) / rodando, com um resumo `Passed: X/9`.
+*   **Caso de Uso**: uma checagem rápida de regressão de que o aparelho e todos os detectores estão saudáveis — se tudo estiver ligado e todas as linhas forem `PASS`, a pilha de sniffer/análise está 100% funcional.
+
+> Todos em `FAIL` geralmente significa apenas que o loopback não está ligado (nada volta no RX), não que um detector esteja quebrado.
+
 ### Indicador de Saúde da Linha (todos os modos)
 A barra de status mostra um indicador sempre ativo `LN:OK` / `LN:LOW!`. Uma linha UART TTL ociosa saudável repousa em nível ALTO; uma linha mantida em BAIXO por período sustentado (curto, transmissor travado ou break contínuo) é um sinal de DoS de linha (guia §8.8) e deixa o indicador vermelho em todos os modos. Um pull-up interno fraco no RX mantém uma linha desconectada lendo `LN:OK`, então apenas uma linha ativamente puxada a 0 dispara o alerta.
 

@@ -9,6 +9,7 @@
 #include "proto_analyzer.h"
 #include "fuzzer.h"
 #include "line_monitor.h"
+#include "tester.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -21,15 +22,16 @@ DeviceMode current_mode = MODE_TEXT_TERMINAL;
 
 bool in_menu = true;
 int menu_selection = 0;
-const int MENU_ITEMS_COUNT = 7;
+const int MENU_ITEMS_COUNT = 8;
 const char* menu_items[] = {
-    "1. Text Terminal",
-    "2. Hex Viewer",
-    "3. Auto-Baudrate",
-    "4. Spammer / Macros",
-    "5. Wi-Fi Bridge",
-    "6. Security Scanner",
-    "7. Parser Fuzzer"
+    "1.Terminal",
+    "2.Hex View",
+    "3.Auto-Baud",
+    "4.Spammer",
+    "5.Wi-Fi AP",
+    "6.Scanner",
+    "7.Fuzzer",
+    "8.Tester"
 };
 
 void draw_dashboard_static() {
@@ -63,6 +65,9 @@ void draw_dashboard_static() {
                 break;
             case MODE_FUZZER:
                 M5.Display.drawString("FUZZER", 6, 1);
+                break;
+            case MODE_TESTER:
+                M5.Display.drawString("TESTER", 6, 1);
                 break;
         }
     }
@@ -418,6 +423,46 @@ void draw_terminal() {
 
         M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
         M5.Display.drawString(is_cardputer() ? "G0:Case Hold:Run Dbl:Menu" : "A:Case B:Run Dbl-B:Menu", 6, 124);
+    } else if (current_mode == MODE_TESTER) {
+        // Draw self-test checklist
+        M5.Display.setFont(&fonts::Font0);
+        M5.Display.setTextSize(1);
+
+        int n = tester_step_count();
+        int cur = tester_current_step();
+        for (int i = 0; i < n; i++) {
+            int y_pos = 33 + i * 10;
+            int r = tester_step_result(i);
+            const char* tag;
+            uint16_t col;
+            if (r == TR_PASS) {
+                tag = "PASS"; col = GREEN;
+            } else if (r == TR_FAIL) {
+                tag = "FAIL"; col = RED;
+            } else if (tester_active && i == cur) {
+                tag = "....";  col = YELLOW; // currently running
+            } else {
+                tag = "  - ";  col = M5.Display.color565(100, 116, 139);
+            }
+            M5.Display.setTextColor(M5.Display.color565(203, 213, 225));
+            M5.Display.drawString(tester_step_name(i), 6, y_pos);
+            M5.Display.setTextColor(col);
+            M5.Display.drawString(tag, 150, y_pos);
+        }
+
+        // Summary / help footer
+        char sum[40];
+        snprintf(sum, sizeof(sum), "Passed: %d/%d", tester_passed(), n);
+        if (tester_active) {
+            M5.Display.setTextColor(YELLOW);
+            M5.Display.drawString("RUNNING...", 6, 124);
+        } else if (cur >= n) {
+            M5.Display.setTextColor(tester_passed() == n ? GREEN : RED);
+            M5.Display.drawString(sum, 6, 124);
+        } else {
+            M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
+            M5.Display.drawString(is_cardputer() ? "Loopback TX-RX. Hold G0: Run" : "Wire TX-RX. B:Run A:Reset", 6, 124);
+        }
     } else {
         M5.Display.setTextColor(RED);
         M5.Display.drawString("Mode not implemented yet.", 12, 45);
@@ -431,16 +476,18 @@ void draw_menu() {
     M5.Display.setFont(&fonts::Font2); // Use larger 8x16 font
     M5.Display.setTextSize(1);
     
+    // Two-column grid keeps the large font while fitting up to 8 modes.
     for (int i = 0; i < MENU_ITEMS_COUNT; i++) {
-        int y_pos = 34 + i * 14; // Spacing of 14 pixels to fit all items
+        int row = i / 2;
+        int col = i % 2;
+        int x = (col == 0) ? 8 : 122;
+        int y_pos = 36 + row * 22; // rows at 36, 58, 80, 102
         if (i == menu_selection) {
-            // Selected item: Indigo background, white text
-            M5.Display.fillRect(6, y_pos - 1, 228, 13, M5.Display.color565(79, 70, 229));
+            M5.Display.fillRect(x - 2, y_pos - 1, 112, 18, M5.Display.color565(79, 70, 229));
             M5.Display.setTextColor(WHITE);
         } else {
-            // Non-selected item: light gray text
             M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
         }
-        M5.Display.drawString(menu_items[i], 12, y_pos);
+        M5.Display.drawString(menu_items[i], x + 2, y_pos);
     }
 }
