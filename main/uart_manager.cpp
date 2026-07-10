@@ -70,6 +70,11 @@ void init_uart(uint32_t baud_rate) {
     // Define physical pins dynamically based on the board type
     ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, get_grove_tx_pin(), get_grove_rx_pin(), UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
+    // Weak pull-up on RX so a disconnected/floating line idles HIGH (matching a
+    // real idle UART line). This prevents the line-anomaly monitor from false-
+    // flagging an unconnected pin, so only a driven low reads as stuck.
+    gpio_pullup_en(get_grove_rx_pin());
+
     // Install driver with 1024-byte buffers
     const int uart_buffer_size = 1024;
     ESP_ERROR_CHECK(uart_driver_install(UART_NUM_1, uart_buffer_size, uart_buffer_size, 0, NULL, 0));

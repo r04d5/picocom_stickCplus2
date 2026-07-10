@@ -7,6 +7,7 @@
 #include "scanner.h"
 #include "proto_analyzer.h"
 #include "fuzzer.h"
+#include "line_monitor.h"
 #include "ui.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -22,6 +23,7 @@ extern "C" void app_main() {
 
     // Initialize the terminal buffers with empty strings
     clear_terminal_buffers();
+    line_monitor_reset();
 
     // Initialize screen with basic layout
     draw_dashboard_static();
@@ -44,9 +46,19 @@ extern "C" void app_main() {
     bool terminal_dirty = false;
     uint32_t last_draw_time = 0;
 
+    bool prev_line_stuck = false;
+
     while (1) {
         // Update button readings
         M5.update();
+
+        // Line-anomaly monitor: sample the RX pin and refresh the status bar
+        // indicator when a sustained stuck-low appears or clears.
+        line_monitor_update(xTaskGetTickCount() * portTICK_PERIOD_MS);
+        if (line_stuck_low() != prev_line_stuck) {
+            prev_line_stuck = line_stuck_low();
+            draw_dashboard_dynamic();
+        }
 
         // Polling check for Auto-Baudrate detection completion or timeout
         if (!in_menu && current_mode == MODE_AUTO_BAUD && ab_state == AB_STATE_RUNNING) {

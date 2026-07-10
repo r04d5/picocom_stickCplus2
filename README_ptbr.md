@@ -155,6 +155,9 @@ Envia payloads deliberadamente malformados ao alvo e observa a vivacidade da lin
 > [!WARNING]
 > O fuzzing pode travar ou corromper o dispositivo alvo. Use apenas em hardware que você possui ou tem autorização para testar.
 
+### Indicador de Saúde da Linha (todos os modos)
+A barra de status mostra um indicador sempre ativo `LN:OK` / `LN:LOW!`. Uma linha UART TTL ociosa saudável repousa em nível ALTO; uma linha mantida em BAIXO por período sustentado (curto, transmissor travado ou break contínuo) é um sinal de DoS de linha (guia §8.8) e deixa o indicador vermelho em todos os modos. Um pull-up interno fraco no RX mantém uma linha desconectada lendo `LN:OK`, então apenas uma linha ativamente puxada a 0 dispara o alerta.
+
 ---
 
 ## 🔄 Teste Cruzado: M5StickC vs M5Cardputer

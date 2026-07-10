@@ -155,6 +155,9 @@ Sends deliberately malformed payloads to the target and watches the RX line for 
 > [!WARNING]
 > Fuzzing can crash or corrupt the target device. Only use it on hardware you own or are authorized to test.
 
+### Line Health Indicator (all modes)
+The status bar shows an always-on `LN:OK` / `LN:LOW!` indicator. A healthy idle TTL UART line rests HIGH; a line held LOW for a sustained period (short, jammed transmitter, or a continuous break condition) is a line-level DoS signal (guide §8.8) and turns the indicator red across every mode. A weak internal pull-up on RX keeps a disconnected line reading `LN:OK`, so only an actively driven-low line trips it.
+
 ---
 
 ## 🔄 Cross-Testing: M5StickC vs M5Cardputer

@@ -8,6 +8,7 @@
 #include "scanner.h"
 #include "proto_analyzer.h"
 #include "fuzzer.h"
+#include "line_monitor.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -107,6 +108,16 @@ void draw_dashboard_dynamic() {
     snprintf(tx_str, sizeof(tx_str), "TX: %u B", (unsigned int)tx_bytes);
     M5.Display.setTextColor(ORANGE);
     M5.Display.drawString(tx_str, 120, 21);
+
+    // Line-anomaly indicator (RX idle level). A sustained stuck-low is a
+    // line-level DoS signal; a healthy idle line reads high.
+    if (line_stuck_low()) {
+        M5.Display.setTextColor(RED);
+        M5.Display.drawString("LN:LOW!", 194, 21);
+    } else {
+        M5.Display.setTextColor(M5.Display.color565(74, 222, 128)); // Green
+        M5.Display.drawString("LN:OK", 194, 21);
+    }
 }
 
 void draw_terminal() {
