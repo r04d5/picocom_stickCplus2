@@ -120,6 +120,21 @@ Cria um Access Point local chamado `M5-UART-Bridge` e sobe um servidor TCP na po
         ```
     3.  Qualquer dado que chegar no pino RX da placa M5 será impresso via rede no PC, e qualquer comando digitado no terminal do PC será enviado de volta para a serial do alvo sem a necessidade de cabos.
 
+### 6. Security Scanner (Scanner de Segurança)
+Analisa **automaticamente** o fluxo RX enquanto ele passa, transformando o reconhecimento manual (ouvir e ler byte a byte) em identificação automática de exposições. Roda de forma passiva em todos os modos e concentra os resultados nesta tela.
+
+*   **Achados de Segurança (detecção de segredos/shell)**: reassembla o fluxo em linhas e classifica cada linha em quatro categorias, mantendo um contador por categoria e a última linha detectada:
+    *   `SHELL`: prompts de console/autenticação expostos (`login:`, `root@`, `/bin/sh`, `busybox`, prompts `#`/`$`/`=>`...).
+    *   `CREDS`: material sensível em texto claro (`psk=`, `passphrase`, `ssid=`, `token=`, `bearer `, `api_key`...).
+    *   `KEYS`: chaves privadas e de API (`-----BEGIN`, `ssh-rsa`, `aws_secret`...).
+    *   `BOOT`: banners e janelas de interrupção de bootloader (`U-Boot`, `Hit any key`, `starting kernel`...).
+*   **Análise de Protocolo (validação de resposta dos macros)**: correlaciona as respostas do alvo aos macros do Spammer, **validando checksums/CRC** para distinguir uma resposta bem-formada de uma malformada/não verificada:
+    *   `AT`: detecta `OK` e `ERROR`/`+CME`.
+    *   `NMEA`: valida o checksum `*XX` das sentenças `$GP...` (sinaliza CRC inválido ou ausente — o teste clássico de parsing inseguro).
+    *   `Modbus RTU`: confere o CRC-16 dos frames binários e sinaliza frames com CRC quebrado.
+*   **Reset (StickC)**: segure **Button A** para zerar todos os contadores.
+*   **Caso de Uso**: deixe o scanner rodando durante o boot do alvo — se um shell root, uma senha de Wi-Fi ou uma chave privada aparecer no log, o contador correspondente acende na hora, sem você precisar ler o dump inteiro. Um indicador `Resp:` ao vivo também aparece na tela do Spammer para correlacionar cada macro enviado com a resposta recebida.
+
 ---
 
 ## 🔄 Teste Cruzado: M5StickC vs M5Cardputer

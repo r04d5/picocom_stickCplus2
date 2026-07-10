@@ -120,6 +120,21 @@ Spins up a local Wi-Fi Access Point (`M5-UART-Bridge`) and binds a TCP server to
         ```
     3.  Any bytes read by the M5 RX pin are wirelessly printed on your PC, and any command typed in your PC terminal is sent to the target RX pin over Wi-Fi.
 
+### 6. Security Scanner
+Automatically inspects the RX stream as it flows, turning manual reconnaissance (listening and reading byte by byte) into automatic identification of exposures. It runs passively across all modes and consolidates the results on this screen.
+
+*   **Security Findings (secret/shell detection)**: reassembles the stream into lines and classifies each line into four categories, keeping a per-category counter and the last matched line:
+    *   `SHELL`: exposed console/auth prompts (`login:`, `root@`, `/bin/sh`, `busybox`, `#`/`$`/`=>` prompts...).
+    *   `CREDS`: plaintext secret material (`psk=`, `passphrase`, `ssid=`, `token=`, `bearer `, `api_key`...).
+    *   `KEYS`: private and API keys (`-----BEGIN`, `ssh-rsa`, `aws_secret`...).
+    *   `BOOT`: bootloader banners and interrupt windows (`U-Boot`, `Hit any key`, `starting kernel`...).
+*   **Protocol Analysis (macro response validation)**: correlates the target's replies with the Spammer macros, **validating checksums/CRCs** to tell a well-formed reply from a malformed / unchecked one:
+    *   `AT`: detects `OK` and `ERROR`/`+CME`.
+    *   `NMEA`: validates the `*XX` checksum of `$GP...` sentences (flags invalid or missing CRC — the classic insecure-parsing test).
+    *   `Modbus RTU`: verifies the CRC-16 of binary frames and flags frames with a broken CRC.
+*   **Reset (StickC)**: hold **Button A** to clear all counters.
+*   **Use Case**: leave the scanner running during the target's boot — if a root shell, a Wi-Fi password, or a private key shows up in the log, the matching counter lights up immediately, without you reading the whole dump. A live `Resp:` indicator also appears on the Spammer screen to correlate each sent macro with the reply received.
+
 ---
 
 ## 🔄 Cross-Testing: M5StickC vs M5Cardputer

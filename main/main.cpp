@@ -4,6 +4,8 @@
 #include "autobaud.h"
 #include "spammer.h"
 #include "wifi_bridge.h"
+#include "scanner.h"
+#include "proto_analyzer.h"
 #include "ui.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -153,6 +155,8 @@ extern "C" void app_main() {
                 if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
                     // Press and hold (BtnA on StickC only): Full reset of active screen and counters
                     clear_terminal_buffers();
+                    scanner_reset();
+                    proto_reset();
                     rx_bytes = 0;
                     tx_bytes = 0;
                     draw_dashboard_dynamic();
@@ -225,6 +229,11 @@ extern "C" void app_main() {
             rx_bytes++;
             data_received = true;
 
+            // Passive security scan and protocol analysis run on every byte,
+            // regardless of the active mode.
+            scanner_feed(c);
+            proto_feed((uint8_t)c);
+
             if (current_mode == MODE_TEXT_TERMINAL) {
                 add_char_to_terminal(c);
             } else if (current_mode == MODE_HEX_VIEWER) {
@@ -238,8 +247,13 @@ extern "C" void app_main() {
             }
         }
 
-        if (data_received && !in_menu) {
-            terminal_dirty = true;
+        if (data_received) {
+            // The drained burst marks an inter-frame idle boundary for the
+            // binary (Modbus) analyzer.
+            proto_frame_boundary();
+            if (!in_menu) {
+                terminal_dirty = true;
+            }
         }
 
         // Refresh rate limit for screen updates (FPS) - Prevents buffer lag and flickering

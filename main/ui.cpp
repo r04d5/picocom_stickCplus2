@@ -5,6 +5,8 @@
 #include "autobaud.h"
 #include "spammer.h"
 #include "wifi_bridge.h"
+#include "scanner.h"
+#include "proto_analyzer.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -17,13 +19,14 @@ DeviceMode current_mode = MODE_TEXT_TERMINAL;
 
 bool in_menu = true;
 int menu_selection = 0;
-const int MENU_ITEMS_COUNT = 5;
+const int MENU_ITEMS_COUNT = 6;
 const char* menu_items[] = {
     "1. Text Terminal",
     "2. Hex Viewer",
     "3. Auto-Baudrate",
     "4. Spammer / Macros",
-    "5. Wi-Fi Bridge"
+    "5. Wi-Fi Bridge",
+    "6. Security Scanner"
 };
 
 void draw_dashboard_static() {
@@ -51,6 +54,9 @@ void draw_dashboard_static() {
                 break;
             case MODE_WIFI_BRIDGE:
                 M5.Display.drawString("WIFI-B", 6, 1);
+                break;
+            case MODE_SCANNER:
+                M5.Display.drawString("SECSCAN", 6, 1);
                 break;
         }
     }
@@ -219,6 +225,16 @@ void draw_terminal() {
         // Help footer
         M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
         M5.Display.drawString(is_cardputer() ? "G0: Cycle | Hold G0: Run | Dbl-G0: Menu" : "A: Select | B: Start/Stop | Dbl-B: Menu", 6, 108);
+
+        // Live protocol response indicator (see Security Scanner for full stats)
+        if (proto_last_event() >= 0) {
+            int ev = proto_last_event();
+            bool bad = (ev == PROTO_AT_ERROR || ev == PROTO_NMEA_BADCRC || ev == PROTO_MODBUS_BADCRC);
+            char rd[46];
+            snprintf(rd, sizeof(rd), "Resp: %s", proto_last_desc());
+            M5.Display.setTextColor(bad ? RED : GREEN);
+            M5.Display.drawString(rd, 6, 120);
+        }
     } else if (current_mode == MODE_WIFI_BRIDGE) {
         // Draw Wi-Fi Bridge UI
         M5.Display.setFont(&fonts::Font0);
@@ -250,6 +266,71 @@ void draw_terminal() {
         M5.Display.drawString("PC run: nc 192.168.4.1 8080", 12, 108);
         M5.Display.setTextColor(YELLOW);
         M5.Display.drawString(is_cardputer() ? "Dbl-click G0 to close AP & Exit" : "Press double-B to close AP & Exit", 12, 120);
+    } else if (current_mode == MODE_SCANNER) {
+        // Draw Security Scanner UI (secrets/shell + protocol response analysis)
+        M5.Display.setFont(&fonts::Font0);
+        M5.Display.setTextSize(1);
+
+        // ---- Security findings (package 1) ----
+        M5.Display.setTextColor(M5.Display.color565(147, 197, 253)); // Soft blue
+        M5.Display.drawString("SECURITY FINDINGS", 6, 34);
+        char tot_buf[24];
+        snprintf(tot_buf, sizeof(tot_buf), "Total: %u", (unsigned int)scanner_get_total());
+        M5.Display.setTextColor(scanner_get_total() > 0 ? RED : M5.Display.color565(156, 163, 175));
+        M5.Display.drawString(tot_buf, 160, 34);
+
+        char l1[40];
+        snprintf(l1, sizeof(l1), "SHELL:%-4u  CREDS:%u",
+                 (unsigned int)scanner_get_count(SCAN_SHELL),
+                 (unsigned int)scanner_get_count(SCAN_CREDS));
+        M5.Display.setTextColor(WHITE);
+        M5.Display.drawString(l1, 6, 46);
+        char l2[40];
+        snprintf(l2, sizeof(l2), "KEYS :%-4u  BOOT :%u",
+                 (unsigned int)scanner_get_count(SCAN_KEYS),
+                 (unsigned int)scanner_get_count(SCAN_BOOT));
+        M5.Display.drawString(l2, 6, 56);
+
+        // Last matched line, tagged with its category
+        int lc = scanner_last_category();
+        if (lc >= 0) {
+            char hit[46];
+            snprintf(hit, sizeof(hit), "[%s] %s", scanner_category_name(lc), scanner_last_hit());
+            M5.Display.setTextColor(M5.Display.color565(251, 191, 36)); // Amber
+            M5.Display.drawString(hit, 6, 68);
+        } else {
+            M5.Display.setTextColor(M5.Display.color565(100, 116, 139));
+            M5.Display.drawString("(listening for exposures...)", 6, 68);
+        }
+
+        M5.Display.drawFastHLine(6, 80, 228, M5.Display.color565(71, 85, 105));
+
+        // ---- Protocol response analysis (package 3) ----
+        M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
+        M5.Display.drawString("PROTOCOL ANALYSIS", 6, 84);
+
+        char p1[40];
+        snprintf(p1, sizeof(p1), "AT  ok:%-3u err:%u",
+                 (unsigned int)proto_count(PROTO_AT_OK),
+                 (unsigned int)proto_count(PROTO_AT_ERROR));
+        M5.Display.setTextColor(WHITE);
+        M5.Display.drawString(p1, 6, 96);
+        char p2[40];
+        snprintf(p2, sizeof(p2), "NMEA ok:%-3u bad:%u   MB ok:%-3u bad:%u",
+                 (unsigned int)proto_count(PROTO_NMEA_OK),
+                 (unsigned int)proto_count(PROTO_NMEA_BADCRC),
+                 (unsigned int)proto_count(PROTO_MODBUS_OK),
+                 (unsigned int)proto_count(PROTO_MODBUS_BADCRC));
+        M5.Display.drawString(p2, 6, 106);
+
+        if (proto_last_event() >= 0) {
+            int ev = proto_last_event();
+            bool bad = (ev == PROTO_AT_ERROR || ev == PROTO_NMEA_BADCRC || ev == PROTO_MODBUS_BADCRC);
+            char pd[46];
+            snprintf(pd, sizeof(pd), "Last: %s", proto_last_desc());
+            M5.Display.setTextColor(bad ? RED : GREEN);
+            M5.Display.drawString(pd, 6, 118);
+        }
     } else {
         M5.Display.setTextColor(RED);
         M5.Display.drawString("Mode not implemented yet.", 12, 45);
@@ -264,10 +345,10 @@ void draw_menu() {
     M5.Display.setTextSize(1);
     
     for (int i = 0; i < MENU_ITEMS_COUNT; i++) {
-        int y_pos = 36 + i * 18; // Spacing of 18 pixels (18, 36, 54...)
+        int y_pos = 35 + i * 16; // Spacing of 16 pixels to fit all items
         if (i == menu_selection) {
             // Selected item: Indigo background, white text
-            M5.Display.fillRect(6, y_pos - 1, 228, 16, M5.Display.color565(79, 70, 229));
+            M5.Display.fillRect(6, y_pos - 1, 228, 15, M5.Display.color565(79, 70, 229));
             M5.Display.setTextColor(WHITE);
         } else {
             // Non-selected item: light gray text
