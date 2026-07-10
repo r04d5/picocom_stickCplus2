@@ -46,7 +46,7 @@ void draw_dashboard_static() {
     } else {
         switch (current_mode) {
             case MODE_TEXT_TERMINAL:
-                M5.Display.drawString("M5 PICOCOM", 6, 1);
+                M5.Display.drawString("UART TOOLS", 6, 1);
                 break;
             case MODE_HEX_VIEWER:
                 M5.Display.drawString("HEXVIEW", 6, 1);
