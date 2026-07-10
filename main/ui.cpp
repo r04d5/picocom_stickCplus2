@@ -3,12 +3,13 @@
 #include "uart_manager.h"
 #include "terminal.h"
 #include "autobaud.h"
+#include "spammer.h"
 #include <string.h>
 #include <stdio.h>
 
 DeviceMode current_mode = MODE_TEXT_TERMINAL;
 
-bool in_menu = false;
+bool in_menu = true;
 int menu_selection = 0;
 const int MENU_ITEMS_COUNT = 5;
 const char* menu_items[] = {
@@ -23,27 +24,27 @@ void draw_dashboard_static() {
     // Blue header (Header)
     M5.Display.fillRect(0, 0, 240, 18, M5.Display.color565(59, 130, 246));
     M5.Display.setTextColor(WHITE);
-    M5.Display.setFont(&fonts::Font0);
+    M5.Display.setFont(&fonts::Font2); // Use larger 8x16 font
     M5.Display.setTextSize(1);
     
     if (in_menu) {
-        M5.Display.drawString("STCP2 MENU", 6, 5);
+        M5.Display.drawString("MENU", 6, 1);
     } else {
         switch (current_mode) {
             case MODE_TEXT_TERMINAL:
-                M5.Display.drawString("STCP2 PICOCOM", 6, 5);
+                M5.Display.drawString("M5 PICOCOM", 6, 1);
                 break;
             case MODE_HEX_VIEWER:
-                M5.Display.drawString("STCP2 HEXVIEW", 6, 5);
+                M5.Display.drawString("HEXVIEW", 6, 1);
                 break;
             case MODE_AUTO_BAUD:
-                M5.Display.drawString("STCP2 AUTO-B", 6, 5);
+                M5.Display.drawString("AUTO-B", 6, 1);
                 break;
             case MODE_SPAMMER:
-                M5.Display.drawString("STCP2 SPAMMER", 6, 5);
+                M5.Display.drawString("SPAMMER", 6, 1);
                 break;
             case MODE_WIFI_BRIDGE:
-                M5.Display.drawString("STCP2 WIFI-B", 6, 5);
+                M5.Display.drawString("WIFI-B", 6, 1);
                 break;
         }
     }
@@ -64,16 +65,21 @@ void draw_dashboard_dynamic() {
     // Update right side of Header (Baud Rate and Echo status)
     M5.Display.fillRect(100, 0, 140, 18, M5.Display.color565(59, 130, 246));
 
+    M5.Display.setFont(&fonts::Font2); // Use larger 8x16 font for header
+    M5.Display.setTextSize(1);
+
     char baud_str[16];
     snprintf(baud_str, sizeof(baud_str), "B:%u", (unsigned int)current_baud);
     M5.Display.setTextColor(YELLOW);
-    M5.Display.drawString(baud_str, 110, 5);
+    M5.Display.drawString(baud_str, 110, 1);
 
     M5.Display.setTextColor(echo_mode ? GREEN : M5.Display.color565(203, 213, 225));
-    M5.Display.drawString(echo_mode ? "ECHO ON" : "ECHO OFF", 180, 5);
+    M5.Display.drawString(echo_mode ? "ECHO ON" : "ECHO OFF", 180, 1);
 
     // Update statistics panel (RX and TX bytes)
     M5.Display.fillRect(0, 18, 240, 14, M5.Display.color565(30, 41, 59));
+    M5.Display.setFont(&fonts::Font0); // Revert to standard font for stats
+    M5.Display.setTextSize(1);
     
     char rx_str[32];
     snprintf(rx_str, sizeof(rx_str), "RX: %u B", (unsigned int)rx_bytes);
@@ -164,6 +170,49 @@ void draw_terminal() {
                 M5.Display.drawString("Press double-B for Menu", 12, 120);
                 break;
         }
+    } else if (current_mode == MODE_SPAMMER) {
+        // Draw Spammer Mode UI
+        M5.Display.setFont(&fonts::Font0);
+        M5.Display.setTextSize(1);
+        
+        // List macros
+        for (int i = 0; i < MACRO_COUNT; i++) {
+            int y_pos = 36 + i * 11;
+            if (i == selected_macro_idx) {
+                M5.Display.setTextColor(YELLOW);
+                M5.Display.drawString(">", 6, y_pos);
+                M5.Display.drawString(macros[i].name, 16, y_pos);
+            } else {
+                M5.Display.setTextColor(M5.Display.color565(156, 163, 175)); // Gray
+                M5.Display.drawString(macros[i].name, 16, y_pos);
+            }
+        }
+        
+        // Horizontal separator line
+        M5.Display.drawFastHLine(6, 82, 228, M5.Display.color565(71, 85, 105));
+        
+        // Status indicator
+        M5.Display.setTextColor(WHITE);
+        M5.Display.drawString("Status:", 12, 88);
+        if (spammer_active) {
+            M5.Display.fillRect(60, 86, 64, 13, GREEN);
+            M5.Display.setTextColor(BLACK);
+            M5.Display.drawString(" ACTIVE ", 64, 88);
+        } else {
+            M5.Display.fillRect(60, 86, 64, 13, M5.Display.color565(71, 85, 105));
+            M5.Display.setTextColor(WHITE);
+            M5.Display.drawString("  IDLE  ", 64, 88);
+        }
+        
+        // Packets sent counter
+        char sent_buf[32];
+        snprintf(sent_buf, sizeof(sent_buf), "Sent: %u pkts", (unsigned int)spam_sent_count);
+        M5.Display.setTextColor(CYAN);
+        M5.Display.drawString(sent_buf, 135, 88);
+        
+        // Help footer
+        M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
+        M5.Display.drawString("A: Select | B: Start/Stop | Dbl-B: Menu", 6, 108);
     } else {
         M5.Display.setTextColor(RED);
         M5.Display.drawString("Mode not implemented yet.", 12, 45);
@@ -174,14 +223,14 @@ void draw_terminal() {
 
 void draw_menu() {
     M5.Display.fillRect(1, 33, 238, 101, M5.Display.color565(15, 23, 42)); // Dark background
-    M5.Display.setFont(&fonts::Font0);
+    M5.Display.setFont(&fonts::Font2); // Use larger 8x16 font
     M5.Display.setTextSize(1);
     
     for (int i = 0; i < MENU_ITEMS_COUNT; i++) {
-        int y_pos = 36 + i * 16;
+        int y_pos = 36 + i * 18; // Spacing of 18 pixels (18, 36, 54...)
         if (i == menu_selection) {
             // Selected item: Indigo background, white text
-            M5.Display.fillRect(6, y_pos - 2, 228, 14, M5.Display.color565(79, 70, 229));
+            M5.Display.fillRect(6, y_pos - 1, 228, 16, M5.Display.color565(79, 70, 229));
             M5.Display.setTextColor(WHITE);
         } else {
             // Non-selected item: light gray text

@@ -2,6 +2,7 @@
 #include "uart_manager.h"
 #include "terminal.h"
 #include "autobaud.h"
+#include "spammer.h"
 #include "ui.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -21,7 +22,11 @@ extern "C" void app_main() {
     // Initialize screen with basic layout
     draw_dashboard_static();
     draw_dashboard_dynamic();
-    draw_terminal();
+    if (in_menu) {
+        draw_menu();
+    } else {
+        draw_terminal();
+    }
 
     // Initialize UART1 with standard baud rate (115200)
     init_uart(current_baud);
@@ -59,6 +64,7 @@ extern "C" void app_main() {
                 stop_autobaud_detection();
                 ab_state = AB_STATE_IDLE;
             }
+            spammer_active = false; // Disable active macro transmission
             in_menu = !in_menu;
             draw_dashboard_static();
             draw_dashboard_dynamic();
@@ -80,6 +86,10 @@ extern "C" void app_main() {
                 
                 if (current_mode == MODE_AUTO_BAUD) {
                     ab_state = AB_STATE_IDLE;
+                }
+                if (current_mode == MODE_SPAMMER) {
+                    spammer_active = false;
+                    spam_sent_count = 0;
                 }
                 
                 draw_dashboard_static();
@@ -104,6 +114,9 @@ extern "C" void app_main() {
                         draw_dashboard_static();
                         draw_dashboard_dynamic();
                     }
+                } else if (current_mode == MODE_SPAMMER) {
+                    selected_macro_idx = (selected_macro_idx + 1) % MACRO_COUNT;
+                    terminal_dirty = true;
                 } else {
                     baud_idx = (baud_idx + 1) % 8; // We have 8 standard rates
                     current_baud = baud_rates[baud_idx];
@@ -111,7 +124,7 @@ extern "C" void app_main() {
                     draw_dashboard_dynamic();
                 }
             } else if (M5.BtnA.wasHold()) {
-                if (current_mode != MODE_AUTO_BAUD) {
+                if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
                     // Press and hold: Full reset of active screen and counters
                     clear_terminal_buffers();
                     rx_bytes = 0;
@@ -142,12 +155,15 @@ extern "C" void app_main() {
                         draw_dashboard_dynamic();
                         draw_terminal();
                     }
+                } else if (current_mode == MODE_SPAMMER) {
+                    spammer_active = !spammer_active;
+                    terminal_dirty = true;
                 } else {
                     echo_mode = !echo_mode;
                     draw_dashboard_dynamic();
                 }
             } else if (M5.BtnB.wasHold()) {
-                if (current_mode != MODE_AUTO_BAUD) {
+                if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
                     // Press and hold: Sends a test packet over serial
                     const char *test_msg = "\r\n[StickC-Plus2 UART Test Packet]\r\n";
                     int len = strlen(test_msg);
@@ -155,6 +171,15 @@ extern "C" void app_main() {
                     tx_bytes += len;
                     draw_dashboard_dynamic();
                 }
+            }
+        }
+
+        // Execute Spammer tick logic
+        if (!in_menu && current_mode == MODE_SPAMMER) {
+            uint32_t prev_sent = spam_sent_count;
+            run_spammer_tick();
+            if (spam_sent_count != prev_sent) {
+                terminal_dirty = true;
             }
         }
 
