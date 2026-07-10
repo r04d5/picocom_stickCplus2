@@ -9,10 +9,39 @@
 #define MAX_COLS 39
 #define MAX_ROWS 11
 
+enum DeviceMode {
+    MODE_TEXT_TERMINAL,
+    MODE_HEX_VIEWER,
+    MODE_AUTO_BAUD,
+    MODE_SPAMMER,
+    MODE_WIFI_BRIDGE
+};
+
+DeviceMode current_mode = MODE_TEXT_TERMINAL;
+
 // Buffer para o terminal
 char terminal_buf[MAX_ROWS][MAX_COLS + 1];
 int current_row = 0;
 int current_col = 0;
+
+// Buffer para o Hex Viewer
+char hex_rows[MAX_ROWS][45];
+int current_hex_row = 0;
+uint32_t hex_byte_count = 0;
+uint8_t current_line_bytes[8];
+int current_line_len = 0;
+
+// Menu de controle
+bool in_menu = false;
+int menu_selection = 0;
+const int MENU_ITEMS_COUNT = 5;
+const char* menu_items[] = {
+    "1. Text Terminal",
+    "2. Hex Viewer",
+    "3. Auto-Baudrate",
+    "4. Spammer / Macros",
+    "5. Wi-Fi Bridge"
+};
 
 // Estatísticas e Estado
 uint32_t rx_bytes = 0;
@@ -31,8 +60,11 @@ QueueHandle_t rx_queue = NULL;
 void draw_dashboard_static();
 void draw_dashboard_dynamic();
 void draw_terminal();
+void draw_menu();
 void init_uart(uint32_t baud_rate);
 void add_char_to_terminal(char c);
+void add_byte_to_hex_terminal(uint8_t b);
+void format_hex_line(int row, uint32_t addr, uint8_t *bytes, int len);
 
 // Task para ler da UART e colocar na Queue de forma assíncrona
 void uart_rx_task(void *pvParameters) {
@@ -102,20 +134,96 @@ void add_char_to_terminal(char c) {
     }
 }
 
+void format_hex_line(int row, uint32_t addr, uint8_t *bytes, int len) {
+    char *buf = hex_rows[row];
+    int written = snprintf(buf, 45, "%03X: ", (unsigned int)(addr & 0xFFF));
+    for (int i = 0; i < 8; i++) {
+        if (i < len) {
+            written += snprintf(buf + written, 45 - written, "%02X ", bytes[i]);
+        } else {
+            written += snprintf(buf + written, 45 - written, "   ");
+        }
+    }
+    // Overwrite the last space before the pipe for compactness
+    if (buf[written - 1] == ' ') {
+        buf[written - 1] = '|';
+    } else {
+        buf[written++] = '|';
+    }
+    for (int i = 0; i < 8; i++) {
+        if (i < len) {
+            char c = bytes[i];
+            if (c >= 32 && c <= 126) {
+                buf[written++] = c;
+            } else {
+                buf[written++] = '.';
+            }
+        } else {
+            buf[written++] = ' ';
+        }
+    }
+    buf[written] = '\0';
+}
+
+void add_byte_to_hex_terminal(uint8_t b) {
+    current_line_bytes[current_line_len++] = b;
+    hex_byte_count++;
+    
+    uint32_t line_addr = hex_byte_count - current_line_len;
+    format_hex_line(current_hex_row, line_addr, current_line_bytes, current_line_len);
+    
+    if (current_line_len == 8) {
+        current_line_len = 0;
+        current_hex_row++;
+        if (current_hex_row >= MAX_ROWS) {
+            for (int i = 1; i < MAX_ROWS; i++) {
+                strcpy(hex_rows[i - 1], hex_rows[i]);
+            }
+            current_hex_row = MAX_ROWS - 1;
+        }
+        memset(hex_rows[current_hex_row], 0, sizeof(hex_rows[current_hex_row]));
+    }
+}
+
 void draw_dashboard_static() {
     // Cabeçalho azul moderno (Header)
     M5.Display.fillRect(0, 0, 240, 18, M5.Display.color565(59, 130, 246));
     M5.Display.setTextColor(WHITE);
     M5.Display.setFont(&fonts::Font0);
     M5.Display.setTextSize(1);
-    M5.Display.drawString("STCP2 PICOCOM", 6, 5);
+    
+    if (in_menu) {
+        M5.Display.drawString("STCP2 MENU", 6, 5);
+    } else {
+        switch (current_mode) {
+            case MODE_TEXT_TERMINAL:
+                M5.Display.drawString("STCP2 PICOCOM", 6, 5);
+                break;
+            case MODE_HEX_VIEWER:
+                M5.Display.drawString("STCP2 HEXVIEW", 6, 5);
+                break;
+            case MODE_AUTO_BAUD:
+                M5.Display.drawString("STCP2 AUTO-B", 6, 5);
+                break;
+            case MODE_SPAMMER:
+                M5.Display.drawString("STCP2 SPAMMER", 6, 5);
+                break;
+            case MODE_WIFI_BRIDGE:
+                M5.Display.drawString("STCP2 WIFI-B", 6, 5);
+                break;
+        }
+    }
 
     // Painel de Estatísticas cinza escuro
     M5.Display.fillRect(0, 18, 240, 14, M5.Display.color565(30, 41, 59));
 
     // Fundo da Janela do Terminal (preto escuro) e bordas
     M5.Display.fillRect(0, 32, 240, 103, M5.Display.color565(15, 23, 42));
-    M5.Display.drawRect(0, 32, 240, 103, M5.Display.color565(51, 65, 85));
+    if (in_menu) {
+        M5.Display.drawRect(0, 32, 240, 103, M5.Display.color565(99, 102, 241)); // Indigo border
+    } else {
+        M5.Display.drawRect(0, 32, 240, 103, M5.Display.color565(51, 65, 85)); // Slate border
+    }
 }
 
 void draw_dashboard_dynamic() {
@@ -147,14 +255,47 @@ void draw_dashboard_dynamic() {
 void draw_terminal() {
     // Limpa a área interna do terminal
     M5.Display.fillRect(1, 33, 238, 101, M5.Display.color565(15, 23, 42));
-    M5.Display.setTextColor(M5.Display.color565(74, 222, 128)); // Verde Terminal
     M5.Display.setFont(&fonts::Font0);
     M5.Display.setTextSize(1);
 
-    for (int i = 0; i < MAX_ROWS; i++) {
-        if (strlen(terminal_buf[i]) > 0 || i <= current_row) {
-            M5.Display.drawString(terminal_buf[i], 6, 35 + i * 9);
+    if (current_mode == MODE_TEXT_TERMINAL) {
+        M5.Display.setTextColor(M5.Display.color565(74, 222, 128)); // Verde Terminal
+        for (int i = 0; i < MAX_ROWS; i++) {
+            if (strlen(terminal_buf[i]) > 0 || i <= current_row) {
+                M5.Display.drawString(terminal_buf[i], 6, 35 + i * 9);
+            }
         }
+    } else if (current_mode == MODE_HEX_VIEWER) {
+        M5.Display.setTextColor(M5.Display.color565(251, 191, 36)); // Amber/Yellow
+        for (int i = 0; i < MAX_ROWS; i++) {
+            if (strlen(hex_rows[i]) > 0 || i <= current_hex_row) {
+                M5.Display.drawString(hex_rows[i], 6, 35 + i * 9);
+            }
+        }
+    } else {
+        M5.Display.setTextColor(RED);
+        M5.Display.drawString("Mode not implemented yet.", 12, 45);
+        M5.Display.drawString("Press double-B to return", 12, 60);
+        M5.Display.drawString("to Menu.", 12, 75);
+    }
+}
+
+void draw_menu() {
+    M5.Display.fillRect(1, 33, 238, 101, M5.Display.color565(15, 23, 42)); // Dark background
+    M5.Display.setFont(&fonts::Font0);
+    M5.Display.setTextSize(1);
+    
+    for (int i = 0; i < MENU_ITEMS_COUNT; i++) {
+        int y_pos = 36 + i * 16;
+        if (i == menu_selection) {
+            // Item selecionado: fundo Indigo, texto branco
+            M5.Display.fillRect(6, y_pos - 2, 228, 14, M5.Display.color565(79, 70, 229));
+            M5.Display.setTextColor(WHITE);
+        } else {
+            // Item não selecionado: texto cinza claro
+            M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
+        }
+        M5.Display.drawString(menu_items[i], 12, y_pos);
     }
 }
 
@@ -166,15 +307,16 @@ extern "C" void app_main() {
     // Configuração de display em modo paisagem
     M5.Display.setRotation(1);
 
+    // Inicializa o buffer do terminal com strings vazias
+    for (int i = 0; i < MAX_ROWS; i++) {
+        memset(terminal_buf[i], 0, sizeof(terminal_buf[i]));
+        memset(hex_rows[i], 0, sizeof(hex_rows[i]));
+    }
+
     // Inicializa a tela com o layout básico
     draw_dashboard_static();
     draw_dashboard_dynamic();
     draw_terminal();
-
-    // Inicializa o buffer do terminal com strings vazias
-    for (int i = 0; i < MAX_ROWS; i++) {
-        memset(terminal_buf[i], 0, sizeof(terminal_buf[i]));
-    }
 
     // Inicializa a UART1 com o baud rate padrão (115200)
     init_uart(current_baud);
@@ -192,45 +334,87 @@ extern "C" void app_main() {
         // Atualiza leitura de botões
         M5.update();
 
-        // Botão Frontal (BtnA)
-        if (M5.BtnA.wasClicked()) {
-            baud_idx = (baud_idx + 1) % (sizeof(baud_rates) / sizeof(baud_rates[0]));
-            current_baud = baud_rates[baud_idx];
-            init_uart(current_baud);
+        // Detecta double-click no botão B para abrir/fechar o menu
+        if (M5.BtnB.wasDoubleClicked()) {
+            in_menu = !in_menu;
+            draw_dashboard_static();
             draw_dashboard_dynamic();
-        } else if (M5.BtnA.wasHold()) {
-            // Pressionar e segurar: Reset completo da tela e contadores
-            for (int i = 0; i < MAX_ROWS; i++) {
-                memset(terminal_buf[i], 0, sizeof(terminal_buf[i]));
+            if (in_menu) {
+                draw_menu();
+            } else {
+                draw_terminal();
             }
-            current_row = 0;
-            current_col = 0;
-            rx_bytes = 0;
-            tx_bytes = 0;
-            draw_dashboard_dynamic();
-            draw_terminal();
         }
 
-        // Botão Lateral (BtnB)
-        if (M5.BtnB.wasClicked()) {
-            echo_mode = !echo_mode;
-            draw_dashboard_dynamic();
-        } else if (M5.BtnB.wasHold()) {
-            // Pressionar e segurar: Envia um pacote de testes pela serial
-            const char *test_msg = "\r\n[StickC-Plus2 UART Test Packet]\r\n";
-            int len = strlen(test_msg);
-            uart_write_bytes(UART_NUM_1, test_msg, len);
-            tx_bytes += len;
-            draw_dashboard_dynamic();
+        if (in_menu) {
+            // Navegação no Menu
+            if (M5.BtnA.wasClicked()) {
+                menu_selection = (menu_selection + 1) % MENU_ITEMS_COUNT;
+                draw_menu();
+            } else if (M5.BtnB.wasSingleClicked()) {
+                current_mode = (DeviceMode)menu_selection;
+                in_menu = false;
+                
+                draw_dashboard_static();
+                draw_dashboard_dynamic();
+                draw_terminal();
+            }
+        } else {
+            // Controles normais nos modos ativos
+            // Botão Frontal (BtnA)
+            if (M5.BtnA.wasClicked()) {
+                baud_idx = (baud_idx + 1) % (sizeof(baud_rates) / sizeof(baud_rates[0]));
+                current_baud = baud_rates[baud_idx];
+                init_uart(current_baud);
+                draw_dashboard_dynamic();
+            } else if (M5.BtnA.wasHold()) {
+                // Pressionar e segurar: Reset completo da tela ativa e contadores
+                if (current_mode == MODE_TEXT_TERMINAL) {
+                    for (int i = 0; i < MAX_ROWS; i++) {
+                        memset(terminal_buf[i], 0, sizeof(terminal_buf[i]));
+                    }
+                    current_row = 0;
+                    current_col = 0;
+                } else if (current_mode == MODE_HEX_VIEWER) {
+                    for (int i = 0; i < MAX_ROWS; i++) {
+                        memset(hex_rows[i], 0, sizeof(hex_rows[i]));
+                    }
+                    current_hex_row = 0;
+                    hex_byte_count = 0;
+                    current_line_len = 0;
+                }
+                rx_bytes = 0;
+                tx_bytes = 0;
+                draw_dashboard_dynamic();
+                draw_terminal();
+            }
+
+            // Botão Lateral (BtnB)
+            if (M5.BtnB.wasSingleClicked()) {
+                echo_mode = !echo_mode;
+                draw_dashboard_dynamic();
+            } else if (M5.BtnB.wasHold()) {
+                // Pressionar e segurar: Envia um pacote de testes pela serial
+                const char *test_msg = "\r\n[StickC-Plus2 UART Test Packet]\r\n";
+                int len = strlen(test_msg);
+                uart_write_bytes(UART_NUM_1, test_msg, len);
+                tx_bytes += len;
+                draw_dashboard_dynamic();
+            }
         }
 
-        // Processa todos os caracteres que chegaram na Queue
+        // Processa todos os caracteres que chegaram na Queue se não estivermos no Menu
         char c;
         bool data_received = false;
         while (xQueueReceive(rx_queue, &c, 0) == pdTRUE) {
             rx_bytes++;
             data_received = true;
-            add_char_to_terminal(c);
+
+            if (current_mode == MODE_TEXT_TERMINAL) {
+                add_char_to_terminal(c);
+            } else if (current_mode == MODE_HEX_VIEWER) {
+                add_byte_to_hex_terminal((uint8_t)c);
+            }
 
             // Ecoa de volta na UART1 se habilitado
             if (echo_mode) {
@@ -239,7 +423,7 @@ extern "C" void app_main() {
             }
         }
 
-        if (data_received) {
+        if (data_received && !in_menu) {
             terminal_dirty = true;
         }
 

@@ -1,73 +1,90 @@
 # M5StickC Plus2 UART Tester (picocom)
 
-Este projeto transforma o M5StickC Plus2 em um testador de UART portátil e interativo (similar ao utilitário `picocom` / modo echo de hardware). É ideal para validar conexões seriais de bancada (ex: testar a UART de um Raspberry Pi, módulos GPS, sensores industriais ou outros microcontroladores de 3.3V) diretamente pela tela do StickC Plus2.
+This project turns the M5StickC Plus2 into a portable, interactive UART tester (similar to the `picocom` utility / hardware echo mode). It is ideal for validating serial bench connections (e.g., testing a Raspberry Pi's UART, GPS modules, industrial sensors, or other 3.3V microcontrollers) directly on the StickC Plus2 screen.
 
-O projeto foi estruturado utilizando o framework oficial **ESP-IDF** nativo e a biblioteca **M5Unified** gerenciada via ESP Component Manager.
+The project is structured using the official native **ESP-IDF** framework and the **M5Unified** library managed via the ESP Component Manager.
 
 ---
 
-## 🔌 Conexões Físicas (Fiação)
+## 🔌 Physical Connections (Wiring)
 
-O conector lateral **Grove** do M5StickC Plus2 expõe os pinos GPIO32 e GPIO33.
+The side **Grove** connector of the M5StickC Plus2 exposes the GPIO32 and GPIO33 pins.
 
 > [!WARNING]
-> O pino vermelho do conector Grove do StickC fornece **5V**. **Não o conecte ao Raspberry Pi**, pois as GPIOs do Pi operam apenas a 3.3V e podem ser danificadas. Alimente o StickC Plus2 via cabo USB-C próprio e faça a fiação apenas para os pinos de dados (TX/RX) e o terra (GND).
+> The red pin of the StickC Grove connector provides **5V**. **Do not connect it to the Raspberry Pi**, as the Pi's GPIOs operate only at 3.3V and can be damaged. Power the StickC Plus2 via its own USB-C cable and only wire the data pins (TX/RX) and the ground (GND).
 
-Conecte os pinos cruzados (TX no RX do outro):
+Connect the pins crosswise (TX to the other's RX):
 
-| Raspberry Pi (Header) | M5StickC Plus2 (Porta Grove) | Fio | Função |
+| Raspberry Pi (Header) | M5StickC Plus2 (Grove Port) | Wire | Function |
 | :--- | :--- | :--- | :--- |
-| **GPIO14 / TXD** (Pino 8) | **GPIO33 / RX** | Azul | Recebimento (RX) no StickC |
-| **GPIO15 / RXD** (Pino 10) | **GPIO32 / TX** | Amarelo | Transmissão (TX) do StickC |
-| **GND** (Pino 6 ou 9) | **GND** | Preto | Terra de referência comum |
+| **GPIO14 / TXD** (Pin 8) | **GPIO33 / RX** | Blue | Receive (RX) on StickC |
+| **GPIO15 / RXD** (Pin 10) | **GPIO32 / TX** | Yellow | Transmit (TX) from StickC |
+| **GND** (Pin 6 or 9) | **GND** | Black | Common reference ground |
 
 ---
 
-## 🎮 Operação e Interface
+## 🎮 Operation and Interface
 
-A interface do dispositivo é desenhada em modo paisagem no display LCD de 240x135 e é dividida em três partes principais:
+The device interface is drawn in landscape mode on the 240x135 LCD display and is divided into three main parts:
 
-1. **Header (Topo - Azul)**: Exibe o nome da aplicação, a velocidade de transmissão ativa (ex: `B:115200`) e se o modo de eco está habilitado (`ECHO ON` / `ECHO OFF`).
-2. **Stats Panel (Meio - Cinza Escuro)**: Exibe o total de bytes lidos (**RX**) e escritos (**TX**) desde o último reinício.
-3. **Terminal Console (Abaixo - Preto)**: Exibe as últimas 11 linhas dos dados recebidos do transmissor em verde de alta visibilidade, com rolagem automática e quebra de linha inteligente.
+1. **Header (Top - Blue)**: Displays the application name, active baud rate (e.g., `B:115200`), and whether echo mode is enabled (`ECHO ON` / `ECHO OFF`).
+2. **Stats Panel (Middle - Dark Gray)**: Displays the total bytes read (**RX**) and written (**TX**) since the last reset.
+3. **Terminal Console (Bottom - Black)**: Displays the last 11 lines of data received from the transmitter in high-visibility green, featuring automatic scrolling and smart line wrapping.
 
-### Controles Físicos
+### Physical Controls
 
-*   **Botão A (Frontal - M5)**:
-    *   **Clique Rápido**: Altera ciclicamente a taxa de baud rate da UART: `9600` -> `19200` -> `38400` -> `57600` -> `115200` -> `230400` -> `460800` -> `921600`. O driver UART é reinstalado de forma limpa a cada troca de velocidade.
-    *   **Pressionar e Segurar (0.5s)**: Reseta completamente a tela do terminal e zera os contadores RX/TX.
-*   **Botão B (Lateral Superior)**:
-    *   **Clique Rápido**: Alterna o modo **Echo** (se ativo, qualquer byte recebido no RX é instantaneamente devolvido pelo TX, ideal para testes de loopback com o terminal do Pi).
-    *   **Pressionar e Segurar (0.5s)**: Envia uma string de teste estruturada pela porta serial (`\r\n[StickC-Plus2 UART Test Packet]\r\n`) para depuração no lado receptor.
+*   **Button A (Front - M5)**:
+    *   **Quick Click**: Cyclically changes the UART baud rate: `9600` -> `19200` -> `38400` -> `57600` -> `115200` -> `230400` -> `460800` -> `921600`. The UART driver is cleanly reinstalled at every speed change.
+    *   **Press and Hold (0.5s)**: Fully resets the terminal screen and clears the RX/TX counters.
+*   **Button B (Top Side)**:
+    *   **Quick Click**: Toggles **Echo** mode (if active, any byte received on RX is instantly sent back through TX, ideal for loopback tests with the Pi's terminal).
+    *   **Press and Hold (0.5s)**: Sends a structured test string through the serial port (`\r\n[StickC-Plus2 UART Test Packet]\r\n`) for debugging on the receiving end.
 
 ---
 
-## 🛠️ Como Compilar e Gravar
+## 🛠️ How to Build and Flash
 
-Como o projeto utiliza o ESP Component Manager integrado com o CMake do ESP-IDF, as dependências (`M5Unified` e `M5GFX`) são baixadas de forma totalmente transparente na primeira compilação.
+Since the project uses the ESP Component Manager integrated with ESP-IDF's CMake, dependencies (`M5Unified` and `M5GFX`) are downloaded completely transparently during the first build.
 
-1. Abra um terminal no diretório raiz do projeto (`picocom_stickCplus2`).
-2. Ative o ambiente do ESP-IDF (ex: `. $HOME/esp/esp-idf/export.sh` ou similar dependendo da sua instalação).
-3. Compile o projeto:
+1. Open a terminal in the root directory of the project (`picocom_stickCplus2`).
+2. Activate the ESP-IDF environment (e.g., `. $HOME/esp/esp-idf/export.sh` or similar, depending on your installation).
+3. Build the project:
    ```bash
    idf.py build
    ```
-4. Grave o firmware no StickC Plus2 e abra o monitor serial para verificar o log de inicialização:
+4. Flash the firmware to the StickC Plus2 and open the serial monitor to check the boot log:
    ```bash
    idf.py -p /dev/ttyACM0 flash monitor
    ```
 
 ---
 
-## 🔍 Estrutura do Repositório
+## 🔍 Repository Structure
 
 ```
-├── CMakeLists.txt         # Definição do projeto CMake do ESP-IDF
-├── sdkconfig.defaults     # Configuração padrão de Flash de 8MB do StickC Plus2
-├── .gitignore             # Arquivos ignorados pelo Git
-├── README.md              # Este manual de uso
+├── CMakeLists.txt         # ESP-IDF CMake project definition
+├── sdkconfig.defaults     # M5StickC Plus2 default 8MB Flash configuration
+├── .gitignore             # Git ignored files
+├── README.md              # This usage manual
 └── main/
-    ├── CMakeLists.txt     # CMake do componente principal
-    ├── idf_component.yml  # Manifesto que baixa o M5Unified do ESP Registry
-    └── main.cpp           # Lógica do picocom (UART nativa + FreeRTOS queues + UI)
+    ├── CMakeLists.txt     # Main component CMake
+    ├── idf_component.yml  # Manifesto downloading M5Unified from the ESP Registry
+    └── main.cpp           # picocom logic (native UART + FreeRTOS queues + UI)
 ```
+
+---
+
+## 🗺️ Roadmap (Future Features)
+
+To make this tool even more powerful for embedded systems development and hardware security testing, the following phases are planned:
+
+*   **Phase 1: Multi-Mode Menu & Hex/Binary Viewer** (Completed)
+    *   Adds a Mode Switch Menu (double-click Button B).
+    *   Adds a live `hexdump` terminal viewer to display non-printable characters.
+*   **Phase 2: Auto-Baudrate Detection** (Pending)
+    *   Measuring RX pulse edge-timings to calculate and configure the correct baud rate automatically.
+*   **Phase 3: Macro Sender & Bootloader Interrupter** (Pending)
+    *   Sending custom command packets (Modbus, AT commands).
+    *   Automatic keyboard spammer to interrupt bootloaders (e.g. U-Boot) on target power-up.
+*   **Phase 4: Wi-Fi bridge (Sniffer Tunnel)** (Pending)
+    *   Bridging the physical UART interface to a wireless WebSocket/TCP socket.
