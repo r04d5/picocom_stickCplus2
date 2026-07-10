@@ -94,10 +94,13 @@ Displays NMEA packets, Modbus commands, or raw binary streams formatted as hexad
 *   **Use Case**: Essential for debugging binary sensors or auditing unknown protocols where non-printable control characters would mess up standard terminal layouts.
 
 ### 3. Auto-Baudrate
-Measures timing intervals of incoming RX pulses using the ESP32 hardware auto-baudrate subsystem and snaps the calculated values to the closest standard baud rate.
-*   **Select Next**: Start or Cancel the scanning routine.
-*   **Confirm/Action (on Success)**: Applies the newly detected baud rate and redirects to the Text Terminal.
-*   **Use Case**: Connect to an unknown serial line (like a router console), boot the target, send characters, and automatically identify the baud rate without trial-and-error.
+Identifies the baud rate of an unknown serial line. It offers **two complementary methods**:
+
+*   **Pulse scan (Select Next / Button A)**: uses the ESP32 hardware auto-baudrate subsystem to measure RX pulse timings and snap to the closest standard rate. Fast, but needs clean edges — works best when the target sends a repeating character (e.g. `U` / `0x55`).
+*   **Baud sweep (Confirm / Button B)**: passive brute-force. Reconfigures the UART across all 8 standard rates (~350 ms each) and scores every rate by how much readable ASCII the target emits, picking the rate with the most printable text. This locks onto any console/boot-log output even when the pulse method cannot (no clean edges), and shows live progress (`Testing: 57600 bps (4/8)`, `Best so far: ...`).
+
+*   **Confirm/Action (on Success)**: Applies the detected baud rate and redirects to the Text Terminal.
+*   **Use Case**: Connect to an unknown serial line (like a router console), boot the target, and automatically identify the baud rate without trial-and-error — pulse scan if you can inject `U`, baud sweep if you can only listen to the boot log.
 
 ### 4. Spammer / Macros
 Automates periodic transmissions of preconfigured macros.

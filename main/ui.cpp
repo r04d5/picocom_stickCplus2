@@ -138,23 +138,46 @@ void draw_terminal() {
                 M5.Display.setTextColor(M5.Display.color565(147, 197, 253)); // Soft blue
                 M5.Display.drawString("AUTO-BAUDRATE DETECTION", 12, 38);
                 M5.Display.setTextColor(WHITE);
-                M5.Display.drawString("1. Connect target RX/TX to Grove.", 12, 53);
-                M5.Display.drawString("2. Send repeating chars (e.g. 'U').", 12, 68);
+                M5.Display.drawString("Two detection methods:", 12, 53);
                 M5.Display.setTextColor(YELLOW);
-                M5.Display.drawString(is_cardputer() ? "Press BTN G0 to START SCAN" : "Press BTN A to START SCAN", 12, 88);
+                M5.Display.drawString(is_cardputer() ? "Click G0: Pulse scan (send 'U')" : "BTN A: Pulse scan (send 'U' 0x55)", 12, 70);
+                M5.Display.drawString(is_cardputer() ? "Hold  G0: Baud sweep (read log)" : "BTN B: Baud sweep (reads text/log)", 12, 85);
                 M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
                 M5.Display.drawString(is_cardputer() ? "Dbl-click G0 to open Menu" : "Press double-B to open Menu", 12, 115);
                 break;
-                
+
             case AB_STATE_RUNNING:
-                M5.Display.setTextColor(YELLOW);
-                M5.Display.drawString("SCANNING UART PORT...", 12, 38);
-                M5.Display.setTextColor(WHITE);
-                M5.Display.drawString("Please send data from host...", 12, 58);
-                M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
-                M5.Display.drawString("Measuring pulse timings...", 12, 78);
-                M5.Display.setTextColor(RED);
-                M5.Display.drawString(is_cardputer() ? "Press BTN G0 to CANCEL" : "Press BTN A to CANCEL", 12, 105);
+                if (ab_method == AB_METHOD_SWEEP) {
+                    M5.Display.setTextColor(YELLOW);
+                    M5.Display.drawString("SWEEPING BAUD RATES...", 12, 38);
+                    int idx = baud_sweep_current_idx();
+                    if (idx > 7) idx = 7;
+                    char sweep_buf[40];
+                    snprintf(sweep_buf, sizeof(sweep_buf), "Testing: %u bps (%d/8)",
+                             (unsigned int)baud_rates[idx], idx + 1);
+                    M5.Display.setTextColor(WHITE);
+                    M5.Display.drawString(sweep_buf, 12, 58);
+                    uint32_t best = baud_sweep_best_baud();
+                    char best_buf[40];
+                    if (best > 0) {
+                        snprintf(best_buf, sizeof(best_buf), "Best so far: %u bps", (unsigned int)best);
+                    } else {
+                        snprintf(best_buf, sizeof(best_buf), "Best so far: --");
+                    }
+                    M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
+                    M5.Display.drawString(best_buf, 12, 78);
+                    M5.Display.setTextColor(RED);
+                    M5.Display.drawString(is_cardputer() ? "Press BTN G0 to CANCEL" : "Press BTN A to CANCEL", 12, 105);
+                } else {
+                    M5.Display.setTextColor(YELLOW);
+                    M5.Display.drawString("SCANNING UART PORT...", 12, 38);
+                    M5.Display.setTextColor(WHITE);
+                    M5.Display.drawString("Please send data from host...", 12, 58);
+                    M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
+                    M5.Display.drawString("Measuring pulse timings...", 12, 78);
+                    M5.Display.setTextColor(RED);
+                    M5.Display.drawString(is_cardputer() ? "Press BTN G0 to CANCEL" : "Press BTN A to CANCEL", 12, 105);
+                }
                 break;
                 
             case AB_STATE_SUCCESS:

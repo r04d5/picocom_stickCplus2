@@ -88,6 +88,7 @@ void start_autobaud_detection() {
     uart_ll_set_autobaud_en(hw, true);
     
     // 5. Update state
+    ab_method = AB_METHOD_HARDWARE;
     ab_state = AB_STATE_RUNNING;
     ab_detected_baud = 0;
     ab_start_time = xTaskGetTickCount() * portTICK_PERIOD_MS;

@@ -94,10 +94,13 @@ Exibe tráfego de dados binários, pacotes NMEA de GPS ou telemetria Modbus RTU 
 *   **Caso de Uso**: Essencial para depurar sensores industriais ou inspecionar tráfego binário de rede sem poluir a tela com caracteres não imprimíveis.
 
 ### 3. Auto-Baudrate (Detecção de Velocidade)
-Mede o intervalo de tempo das bordas dos pulsos de RX recebidos e aproxima o cálculo para a taxa padrão de baud rate mais próxima.
-*   **Ciclar / Próximo**: Inicia ou Cancela a rotina de varredura (scanning).
-*   **Confirmar / Ação (no Sucesso)**: Aplica o baud rate detectado e redireciona automaticamente para o Terminal de Texto.
-*   **Caso de Uso**: Conecte a uma linha de console desconhecida, gere tráfego na linha, e capture a velocidade da porta instantaneamente sem adivinhações.
+Identifica o baud rate de uma linha serial desconhecida. Oferece **dois métodos complementares**:
+
+*   **Pulse scan (Ciclar / Botão A)**: usa o subsistema de auto-baudrate por hardware do ESP32 para medir os tempos dos pulsos de RX e aproximar da taxa padrão mais próxima. Rápido, mas precisa de bordas limpas — funciona melhor quando o alvo envia um caractere repetido (ex.: `U` / `0x55`).
+*   **Baud sweep (Confirmar / Botão B)**: força-bruta passiva. Reconfigura o UART nas 8 taxas padrão (~350 ms cada) e pontua cada taxa pela quantidade de ASCII legível que o alvo emite, escolhendo a taxa com mais texto imprimível. Trava em qualquer saída de console/log de boot mesmo quando o método de pulso não consegue (sem bordas limpas), mostrando progresso ao vivo (`Testing: 57600 bps (4/8)`, `Best so far: ...`).
+
+*   **Confirmar / Ação (no Sucesso)**: Aplica o baud rate detectado e redireciona para o Terminal de Texto.
+*   **Caso de Uso**: Conecte a uma linha desconhecida, ligue o alvo e identifique o baud rate sem adivinhação — pulse scan se puder injetar `U`, baud sweep se só conseguir escutar o log de boot.
 
 ### 4. Spammer / Macros (Envio Automático)
 Automatiza o envio periódico de comandos e macros estruturadas pela serial.

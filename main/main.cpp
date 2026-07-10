@@ -50,15 +50,26 @@ extern "C" void app_main() {
 
         // Polling check for Auto-Baudrate detection completion or timeout
         if (!in_menu && current_mode == MODE_AUTO_BAUD && ab_state == AB_STATE_RUNNING) {
-            uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
-            uart_dev_t *hw = UART_LL_GET_HW(UART_NUM_1);
-            uint32_t edges = uart_ll_get_rxd_edge_cnt(hw);
-            
-            if (edges >= 40 || (now_ms - ab_start_time >= 2000)) {
-                stop_autobaud_detection();
-                draw_terminal();
-                draw_dashboard_static();
-                draw_dashboard_dynamic();
+            if (ab_method == AB_METHOD_SWEEP) {
+                int prev_idx = baud_sweep_current_idx();
+                baud_sweep_step();
+                // Redraw on each rate advance (progress) and on completion.
+                if (ab_state != AB_STATE_RUNNING || baud_sweep_current_idx() != prev_idx) {
+                    draw_terminal();
+                    draw_dashboard_static();
+                    draw_dashboard_dynamic();
+                }
+            } else {
+                uint32_t now_ms = xTaskGetTickCount() * portTICK_PERIOD_MS;
+                uart_dev_t *hw = UART_LL_GET_HW(UART_NUM_1);
+                uint32_t edges = uart_ll_get_rxd_edge_cnt(hw);
+
+                if (edges >= 40 || (now_ms - ab_start_time >= 2000)) {
+                    stop_autobaud_detection();
+                    draw_terminal();
+                    draw_dashboard_static();
+                    draw_dashboard_dynamic();
+                }
             }
         }
 
@@ -84,7 +95,11 @@ extern "C" void app_main() {
         // Detect open/close menu trigger
         if (toggle_menu_pressed) {
             if (ab_state == AB_STATE_RUNNING) {
-                stop_autobaud_detection();
+                if (ab_method == AB_METHOD_SWEEP) {
+                    cancel_baud_sweep();
+                } else {
+                    stop_autobaud_detection();
+                }
                 ab_state = AB_STATE_IDLE;
             }
             if (current_mode == MODE_WIFI_BRIDGE) {
@@ -139,8 +154,12 @@ extern "C" void app_main() {
                         draw_dashboard_static();
                         draw_dashboard_dynamic();
                     } else if (ab_state == AB_STATE_RUNNING) {
-                        // Cancel
-                        stop_autobaud_detection();
+                        // Cancel (whichever method is running)
+                        if (ab_method == AB_METHOD_SWEEP) {
+                            cancel_baud_sweep();
+                        } else {
+                            stop_autobaud_detection();
+                        }
                         ab_state = AB_STATE_IDLE;
                         draw_terminal();
                         draw_dashboard_static();
@@ -187,10 +206,16 @@ extern "C" void app_main() {
                         init_uart(current_baud);
                         current_mode = MODE_TEXT_TERMINAL;
                         ab_state = AB_STATE_IDLE;
-                        
+
                         draw_dashboard_static();
                         draw_dashboard_dynamic();
                         draw_terminal();
+                    } else if (ab_state == AB_STATE_IDLE || ab_state == AB_STATE_FAILED) {
+                        // Start the passive brute-force baud sweep.
+                        start_baud_sweep();
+                        draw_terminal();
+                        draw_dashboard_static();
+                        draw_dashboard_dynamic();
                     }
                 } else if (current_mode == MODE_SPAMMER) {
                     spammer_active = !spammer_active;
