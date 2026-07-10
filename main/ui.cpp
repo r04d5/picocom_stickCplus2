@@ -4,6 +4,7 @@
 #include "terminal.h"
 #include "autobaud.h"
 #include "spammer.h"
+#include "wifi_bridge.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -213,6 +214,37 @@ void draw_terminal() {
         // Help footer
         M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
         M5.Display.drawString("A: Select | B: Start/Stop | Dbl-B: Menu", 6, 108);
+    } else if (current_mode == MODE_WIFI_BRIDGE) {
+        // Draw Wi-Fi Bridge UI
+        M5.Display.setFont(&fonts::Font0);
+        M5.Display.setTextSize(1);
+        
+        M5.Display.setTextColor(M5.Display.color565(147, 197, 253)); // Soft blue
+        M5.Display.drawString("WI-FI TRANSPARENT BRIDGE", 12, 38);
+        
+        M5.Display.setTextColor(WHITE);
+        M5.Display.drawString("SSID: M5-UART-Bridge", 12, 53);
+        M5.Display.drawString("TCP:  192.168.4.1:8080", 12, 68);
+        
+        // Client Connection Status
+        M5.Display.drawString("Client:", 12, 88);
+        if (client_connected) {
+            M5.Display.fillRect(64, 86, 164, 13, GREEN);
+            M5.Display.setTextColor(BLACK);
+            char client_buf[32];
+            snprintf(client_buf, sizeof(client_buf), " %s ", client_ip_str);
+            M5.Display.drawString(client_buf, 68, 88);
+        } else {
+            M5.Display.fillRect(64, 86, 96, 13, M5.Display.color565(71, 85, 105));
+            M5.Display.setTextColor(WHITE);
+            M5.Display.drawString(" DISCONNECTED ", 68, 88);
+        }
+        
+        // Help / Exit info
+        M5.Display.setTextColor(M5.Display.color565(156, 163, 175)); // Gray
+        M5.Display.drawString("PC run: nc 192.168.4.1 8080", 12, 108);
+        M5.Display.setTextColor(YELLOW);
+        M5.Display.drawString("Press double-B to close AP & Exit", 12, 120);
     } else {
         M5.Display.setTextColor(RED);
         M5.Display.drawString("Mode not implemented yet.", 12, 45);

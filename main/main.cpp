@@ -3,6 +3,7 @@
 #include "terminal.h"
 #include "autobaud.h"
 #include "spammer.h"
+#include "wifi_bridge.h"
 #include "ui.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -64,6 +65,9 @@ extern "C" void app_main() {
                 stop_autobaud_detection();
                 ab_state = AB_STATE_IDLE;
             }
+            if (current_mode == MODE_WIFI_BRIDGE) {
+                stop_wifi_bridge();
+            }
             spammer_active = false; // Disable active macro transmission
             in_menu = !in_menu;
             draw_dashboard_static();
@@ -90,6 +94,9 @@ extern "C" void app_main() {
                 if (current_mode == MODE_SPAMMER) {
                     spammer_active = false;
                     spam_sent_count = 0;
+                }
+                if (current_mode == MODE_WIFI_BRIDGE) {
+                    start_wifi_bridge();
                 }
                 
                 draw_dashboard_static();
@@ -180,6 +187,15 @@ extern "C" void app_main() {
             run_spammer_tick();
             if (spam_sent_count != prev_sent) {
                 terminal_dirty = true;
+            }
+        }
+
+        // Check Wi-Fi bridge connection status changes
+        if (!in_menu && current_mode == MODE_WIFI_BRIDGE) {
+            static bool prev_connected = false;
+            if (client_connected != prev_connected) {
+                terminal_dirty = true;
+                prev_connected = client_connected;
             }
         }
 
