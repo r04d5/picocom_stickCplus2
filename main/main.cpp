@@ -59,8 +59,27 @@ extern "C" void app_main() {
             }
         }
 
-        // Detect double-click on Button B to open/close menu
-        if (M5.BtnB.wasDoubleClicked()) {
+        // Determine if we are on Cardputer to adapt button gestures
+        bool is_cardputer = (M5.getBoard() == m5::board_t::board_M5Cardputer || M5.getBoard() == m5::board_t::board_M5CardputerADV);
+        
+        bool toggle_menu_pressed = false;
+        bool select_next_pressed = false;
+        bool confirm_action_pressed = false;
+        bool test_packet_pressed = false;
+        
+        if (is_cardputer) {
+            toggle_menu_pressed = M5.BtnA.wasDoubleClicked();
+            select_next_pressed = M5.BtnA.wasClicked();
+            confirm_action_pressed = M5.BtnA.wasHold();
+        } else {
+            toggle_menu_pressed = M5.BtnB.wasDoubleClicked();
+            select_next_pressed = M5.BtnA.wasClicked();
+            confirm_action_pressed = M5.BtnB.wasSingleClicked();
+            test_packet_pressed = M5.BtnB.wasHold();
+        }
+
+        // Detect open/close menu trigger
+        if (toggle_menu_pressed) {
             if (ab_state == AB_STATE_RUNNING) {
                 stop_autobaud_detection();
                 ab_state = AB_STATE_IDLE;
@@ -81,10 +100,10 @@ extern "C" void app_main() {
 
         if (in_menu) {
             // Menu Navigation
-            if (M5.BtnA.wasClicked()) {
+            if (select_next_pressed) {
                 menu_selection = (menu_selection + 1) % MENU_ITEMS_COUNT;
                 draw_menu();
-            } else if (M5.BtnB.wasSingleClicked()) {
+            } else if (confirm_action_pressed) {
                 current_mode = (DeviceMode)menu_selection;
                 in_menu = false;
                 
@@ -106,7 +125,7 @@ extern "C" void app_main() {
         } else {
             // Normal controls in active modes
             // Front Button (BtnA)
-            if (M5.BtnA.wasClicked()) {
+            if (select_next_pressed) {
                 if (current_mode == MODE_AUTO_BAUD) {
                     if (ab_state == AB_STATE_IDLE || ab_state == AB_STATE_SUCCESS || ab_state == AB_STATE_FAILED) {
                         start_autobaud_detection();
@@ -130,9 +149,9 @@ extern "C" void app_main() {
                     init_uart(current_baud);
                     draw_dashboard_dynamic();
                 }
-            } else if (M5.BtnA.wasHold()) {
+            } else if (!is_cardputer && M5.BtnA.wasHold()) {
                 if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
-                    // Press and hold: Full reset of active screen and counters
+                    // Press and hold (BtnA on StickC only): Full reset of active screen and counters
                     clear_terminal_buffers();
                     rx_bytes = 0;
                     tx_bytes = 0;
@@ -141,8 +160,8 @@ extern "C" void app_main() {
                 }
             }
 
-            // Side Button (BtnB)
-            if (M5.BtnB.wasSingleClicked()) {
+            // Confirm / Action button trigger
+            if (confirm_action_pressed) {
                 if (current_mode == MODE_AUTO_BAUD) {
                     if (ab_state == AB_STATE_SUCCESS) {
                         // Apply the detected baudrate
@@ -169,9 +188,9 @@ extern "C" void app_main() {
                     echo_mode = !echo_mode;
                     draw_dashboard_dynamic();
                 }
-            } else if (M5.BtnB.wasHold()) {
+            } else if (test_packet_pressed) {
                 if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
-                    // Press and hold: Sends a test packet over serial
+                    // Press and hold (BtnB on StickC only): Sends a test packet over serial
                     const char *test_msg = "\r\n[StickC-Plus2 UART Test Packet]\r\n";
                     int len = strlen(test_msg);
                     uart_write_bytes(UART_NUM_1, test_msg, len);

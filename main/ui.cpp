@@ -8,6 +8,11 @@
 #include <string.h>
 #include <stdio.h>
 
+static bool is_cardputer() {
+    auto b = M5.getBoard();
+    return (b == m5::board_t::board_M5Cardputer || b == m5::board_t::board_M5CardputerADV);
+}
+
 DeviceMode current_mode = MODE_TEXT_TERMINAL;
 
 bool in_menu = true;
@@ -125,9 +130,9 @@ void draw_terminal() {
                 M5.Display.drawString("1. Connect target RX/TX to Grove.", 12, 53);
                 M5.Display.drawString("2. Send repeating chars (e.g. 'U').", 12, 68);
                 M5.Display.setTextColor(YELLOW);
-                M5.Display.drawString("Press BTN A to START SCAN", 12, 88);
+                M5.Display.drawString(is_cardputer() ? "Press BTN G0 to START SCAN" : "Press BTN A to START SCAN", 12, 88);
                 M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
-                M5.Display.drawString("Press double-B to open Menu", 12, 115);
+                M5.Display.drawString(is_cardputer() ? "Dbl-click G0 to open Menu" : "Press double-B to open Menu", 12, 115);
                 break;
                 
             case AB_STATE_RUNNING:
@@ -138,7 +143,7 @@ void draw_terminal() {
                 M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
                 M5.Display.drawString("Measuring pulse timings...", 12, 78);
                 M5.Display.setTextColor(RED);
-                M5.Display.drawString("Press BTN A to CANCEL", 12, 105);
+                M5.Display.drawString(is_cardputer() ? "Press BTN G0 to CANCEL" : "Press BTN A to CANCEL", 12, 105);
                 break;
                 
             case AB_STATE_SUCCESS:
@@ -154,9 +159,9 @@ void draw_terminal() {
                 
                 M5.Display.setFont(&fonts::Font0);
                 M5.Display.setTextColor(GREEN);
-                M5.Display.drawString("Press BTN B to APPLY", 12, 105);
+                M5.Display.drawString(is_cardputer() ? "Hold BTN G0 to APPLY" : "Press BTN B to APPLY", 12, 105);
                 M5.Display.setTextColor(YELLOW);
-                M5.Display.drawString("Press BTN A to RETRY", 12, 120);
+                M5.Display.drawString(is_cardputer() ? "Press BTN G0 to RETRY" : "Press BTN A to RETRY", 12, 120);
                 break;
                 
             case AB_STATE_FAILED:
@@ -166,9 +171,9 @@ void draw_terminal() {
                 M5.Display.drawString("No clear signal or framing match.", 12, 58);
                 M5.Display.drawString("Make sure host is sending 'U' (0x55).", 12, 73);
                 M5.Display.setTextColor(YELLOW);
-                M5.Display.drawString("Press BTN A to RETRY", 12, 105);
+                M5.Display.drawString(is_cardputer() ? "Press BTN G0 to RETRY" : "Press BTN A to RETRY", 12, 105);
                 M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
-                M5.Display.drawString("Press double-B for Menu", 12, 120);
+                M5.Display.drawString(is_cardputer() ? "Dbl-click G0 for Menu" : "Press double-B for Menu", 12, 120);
                 break;
         }
     } else if (current_mode == MODE_SPAMMER) {
@@ -213,7 +218,7 @@ void draw_terminal() {
         
         // Help footer
         M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
-        M5.Display.drawString("A: Select | B: Start/Stop | Dbl-B: Menu", 6, 108);
+        M5.Display.drawString(is_cardputer() ? "G0: Cycle | Hold G0: Run | Dbl-G0: Menu" : "A: Select | B: Start/Stop | Dbl-B: Menu", 6, 108);
     } else if (current_mode == MODE_WIFI_BRIDGE) {
         // Draw Wi-Fi Bridge UI
         M5.Display.setFont(&fonts::Font0);
@@ -244,11 +249,11 @@ void draw_terminal() {
         M5.Display.setTextColor(M5.Display.color565(156, 163, 175)); // Gray
         M5.Display.drawString("PC run: nc 192.168.4.1 8080", 12, 108);
         M5.Display.setTextColor(YELLOW);
-        M5.Display.drawString("Press double-B to close AP & Exit", 12, 120);
+        M5.Display.drawString(is_cardputer() ? "Dbl-click G0 to close AP & Exit" : "Press double-B to close AP & Exit", 12, 120);
     } else {
         M5.Display.setTextColor(RED);
         M5.Display.drawString("Mode not implemented yet.", 12, 45);
-        M5.Display.drawString("Press double-B to return", 12, 60);
+        M5.Display.drawString(is_cardputer() ? "Dbl-click G0 to return" : "Press double-B to return", 12, 60);
         M5.Display.drawString("to Menu.", 12, 75);
     }
 }

@@ -1,5 +1,22 @@
 #include "uart_manager.h"
 #include <driver/gpio.h>
+#include <M5Unified.h>
+
+gpio_num_t get_grove_tx_pin() {
+    auto b = M5.getBoard();
+    if (b == m5::board_t::board_M5Cardputer || b == m5::board_t::board_M5CardputerADV) {
+        return GPIO_NUM_1;
+    }
+    return GPIO_NUM_32;
+}
+
+gpio_num_t get_grove_rx_pin() {
+    auto b = M5.getBoard();
+    if (b == m5::board_t::board_M5Cardputer || b == m5::board_t::board_M5CardputerADV) {
+        return GPIO_NUM_2;
+    }
+    return GPIO_NUM_33;
+}
 
 // Baud rate configuration
 uint32_t baud_rates[] = {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600};
@@ -50,8 +67,8 @@ void init_uart(uint32_t baud_rate) {
     // Configure basic parameters
     ESP_ERROR_CHECK(uart_param_config(UART_NUM_1, &uart_config));
 
-    // Define physical pins: TX = GPIO32, RX = GPIO33
-    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, GPIO_NUM_32, GPIO_NUM_33, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
+    // Define physical pins dynamically based on the board type
+    ESP_ERROR_CHECK(uart_set_pin(UART_NUM_1, get_grove_tx_pin(), get_grove_rx_pin(), UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
     // Install driver with 1024-byte buffers
     const int uart_buffer_size = 1024;

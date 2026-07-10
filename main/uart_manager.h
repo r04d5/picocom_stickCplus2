@@ -20,6 +20,10 @@ extern bool echo_mode;
 extern QueueHandle_t rx_queue;
 extern volatile bool uart_rx_enabled;
 
+#include <driver/gpio.h>
+
 // Function prototypes
+gpio_num_t get_grove_tx_pin();
+gpio_num_t get_grove_rx_pin();
 void init_uart(uint32_t baud_rate);
 void uart_rx_task(void *pvParameters);

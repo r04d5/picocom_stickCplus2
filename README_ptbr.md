@@ -1,25 +1,27 @@
-# M5 UART Tester (picocom / sniffer / pentesting)
+# M5 UART Tester & Sniffer (M5StickC Plus/Plus2 & M5Cardputer)
 
-Este projeto transforma o seu dispositivo M5 baseado em ESP32 (como M5StickC, M5StickC Plus ou M5StickC Plus2) em um testador de UART portátil e interativo, sniffer sem fio e ferramenta de hardware pentesting. É ideal para validar conexões seriais de bancada, depurar protocolos personalizados, capturar taxas de baud rate desconhecidas, interromper sequências de bootloaders e realizar auditorias de segurança física em linhas seriais de 3.3V diretamente na tela do dispositivo.
+Este projeto transforma o seu dispositivo M5 baseado em ESP32/ESP32-S3 (como M5StickC, M5StickC Plus, M5StickC Plus2 ou M5Cardputer) em um testador de UART portátil e interativo, sniffer sem fio e ferramenta de hardware pentesting. É ideal para validar conexões seriais de bancada, depurar protocolos personalizados, capturar taxas de baud rate desconhecidas, interromper sequências de bootloaders e realizar auditorias de segurança física em linhas seriais de 3.3V diretamente na tela do dispositivo.
 
-O projeto foi desenvolvido nativamente utilizando o framework oficial **ESP-IDF** e a biblioteca **M5Unified**.
+O firmware possui **detecção automática de hardware em tempo de execução**, permitindo que o **exatamente mesmo código** seja compilado e executado tanto no M5StickC Plus2 quanto no M5Cardputer, ajustando automaticamente os pinos físicos da UART e os controles de navegação!
 
 ---
 
-## 🔌 Conexões Físicas (Fiação)
+## 🔌 Conexões Físicas e Fiação
 
-O conector lateral **Grove** do dispositivo M5 expõe os pinos GPIO32 e GPIO33.
+Os dispositivos M5 expõem suas linhas de comunicação serial através da porta **Grove**:
+*   **M5StickC / Plus / Plus2**: TX é `GPIO32`, RX é `GPIO33`.
+*   **M5Cardputer**: TX é `GPIO1`, RX é `GPIO2`.
 
 > [!WARNING]
 > O pino vermelho do conector Grove fornece **5V**. **Não o conecte diretamente a alvos com lógica de 3.3V (como o Raspberry Pi)**, pois as GPIOs do Pi operam apenas a 3.3V e podem ser danificadas. Alimente o dispositivo M5 via cabo USB-C próprio e faça a fiação apenas para os pinos de dados (TX/RX) e o terra comum (GND).
 
 Conecte os pinos cruzados (TX no RX do outro, RX no TX do outro):
 
-| Alvo (ex: Raspberry Pi) | Dispositivo M5 (Porta Grove) | Fio | Função |
+| Alvo (ex: Raspberry Pi) | M5StickC (Porta Grove) | M5Cardputer (Porta Grove) | Função |
 | :--- | :--- | :--- | :--- |
-| **TXD / GPIO14** (Pino 8) | **GPIO33 / RX** | Azul | Recebimento (RX) no M5 |
-| **RXD / GPIO15** (Pino 10) | **GPIO32 / TX** | Amarelo | Transmissão (TX) do M5 |
-| **GND** (Pino 6 ou 9) | **GND** | Preto | Terra de referência comum |
+| **TXD / GPIO14** | **GPIO33 / RX** (Azul) | **GPIO2 / RX** (Azul) | Recebimento (RX) no M5 |
+| **RXD / GPIO15** | **GPIO32 / TX** (Amarelo) | **GPIO1 / TX** (Amarelo) | Transmissão (TX) do M5 |
+| **GND** | **GND** (Preto) | **GND** (Preto) | Terra de referência comum |
 
 ---
 
@@ -65,44 +67,48 @@ Em auditorias de segurança de hardware e pentesting, a UART é uma das interfac
 
 ---
 
-## 🎮 Interface e Modos Interativos
+## 🎮 Interface e Controles Interativos
 
-Ao ligar o dispositivo, ele apresenta o **Menu de Seleção de Modo**.
+Ao ligar o dispositivo, ele apresenta o **Menu de Seleção de Modo**. Os controles adaptam-se automaticamente ao hardware detectado:
 
-### Controles de Navegação
-*   **Botão A (Frontal - M5)**: Alterna entre os modos disponíveis.
-*   **Botão B (Lateral Superior)**: Confirma a seleção / Entra no modo.
-*   **Botão B (Duplo Clique)**: Pressione a qualquer momento dentro de um modo para sair e retornar ao menu principal.
+### Tabela de Mapeamento de Controles
+
+| Ação | Controles no M5StickC | Controles no M5Cardputer (BTN G0) |
+| :--- | :--- | :--- |
+| **Ciclar / Próximo Item** | Clique **Botão A** | Clique **Botão G0** |
+| **Confirmar / Ação** | Clique **Botão B** | Pressione e Segure **Botão G0** |
+| **Abrir/Fechar Menu (Sair)**| Duplo clique **Botão B** | Duplo clique **Botão G0** |
+| **Resetar Terminal/Stats** | Segurar **Botão A** | *(Dbl-clique G0 para sair e reentrar)* |
 
 ---
 
 ### 1. Text Terminal (Terminal de Texto)
 Exibe tráfego serial ASCII/UTF-8 em verde de alta visibilidade.
-*   **Botão A (Clique)**: Altera ciclicamente a taxa de baud rate ativa: `9600` -> `19200` -> `38400` -> `57600` -> `115200` -> `230400` -> `460800` -> `921600`.
-*   **Botão A (Segurar)**: Limpa a tela do terminal e zera os contadores RX/TX.
-*   **Botão B (Clique)**: Alterna o **Modo Echo** (devolve instantaneamente pelo TX tudo que chega no pino RX).
-*   **Botão B (Segurar)**: Transmite um pacote de string de teste serial (`\r\n[StickC-Plus2 UART Test Packet]\r\n`).
+*   **Ciclar / Próximo**: Altera ciclicamente a taxa de baud rate ativa: `9600` -> `19200` -> `38400` -> `57600` -> `115200` -> `230400` -> `460800` -> `921600`.
+*   **Confirmar / Ação**: Alterna o **Modo Echo** (devolve instantaneamente pelo TX tudo que chega no pino RX).
+*   **StickC Segurar BtnB**: Transmite um pacote de string de teste serial (`\r\n[StickC-Plus2 UART Test Packet]\r\n`).
 
 ### 2. Hex Viewer (Visualizador Hexadecimal)
 Exibe tráfego de dados binários, pacotes NMEA de GPS ou telemetria Modbus RTU formatados em blocos hexadecimais (`ADDR: XX XX XX XX XX XX XX XX | ascii`).
-*   **Botões A e B**: Possuem os mesmos controles do Terminal de Texto.
+*   **Controles**: Mesmos controles do Terminal de Texto.
 *   **Caso de Uso**: Essencial para depurar sensores industriais ou inspecionar tráfego binário de rede sem poluir a tela com caracteres não imprimíveis.
 
 ### 3. Auto-Baudrate (Detecção de Velocidade)
 Mede o intervalo de tempo das bordas dos pulsos de RX recebidos e aproxima o cálculo para a taxa padrão de baud rate mais próxima.
-*   **Botão A**: Inicia ou Cancela a rotina de varredura (scanning).
-*   **Botão B (Clique Simples após Sucesso)**: Aplica o baud rate detectado e redireciona automaticamente para o Terminal de Texto.
-*   **Caso de Uso**: Conecte a uma linha de console desconhecida (como um roteador), ligue a placa-alvo para gerar tráfego de boot, e capture a velocidade da porta instantaneamente sem adivinhações.
+*   **Ciclar / Próximo**: Inicia ou Cancela a rotina de varredura (scanning).
+*   **Confirmar / Ação (no Sucesso)**: Aplica o baud rate detectado e redireciona automaticamente para o Terminal de Texto.
+*   **Caso de Uso**: Conecte a uma linha de console desconhecida, gere tráfego na linha, e capture a velocidade da porta instantaneamente sem adivinhações.
 
 ### 4. Spammer / Macros (Envio Automático)
 Automatiza o envio periódico de comandos e macros estruturadas pela serial.
-*   **Botão A (Clique)**: Alterna entre os templates de macro configurados:
+*   **Ciclar / Próximo**: Alterna entre os templates de macro configurados:
     1.  `U-Boot Interrupt`: Envia espaço em branco `' '` a cada 15ms.
-    2.  `AT Attention`: Envia `"AT\r\n"` a cada 500ms (testa status de modems).
+    2.  `AT Attention`: Envia `"AT\r\n"` a cada 500ms.
     3.  `Modbus RTU Poll`: Envia frame de leitura `\x01\x03\x00\x00\x00\x01\x84\x0A` a cada 1000ms.
     4.  `GPS Query`: Envia `"$EGPQ,RMC*3C\r\n"` a cada 2000ms.
-*   **Botão B (Clique)**: Ativa / Desativa a transmissão periódica.
-*   **Caso de Uso**: Interrompe loops de boot (como U-Boot) enviando comandos em milissegundos assim que o hardware alvo é alimentado, ou testa comportamento de repetidores Modbus.
+    5.  `Loopback Ping`: Envia `"PING\n"` a cada 250ms (ideal para testes de loopback).
+*   **Confirmar / Ação**: Ativa / Desativa a transmissão periódica.
+*   **Caso de Uso**: Interrompe loops de boot (como U-Boot) ou testa comportamento de repetidores e consoles seriais.
 
 ### 5. Wi-Fi Bridge (Ponte Sem Fio / Tunnel)
 Cria um Access Point local chamado `M5-UART-Bridge` e sobe um servidor TCP na porta `8080`.
@@ -116,24 +122,46 @@ Cria um Access Point local chamado `M5-UART-Bridge` e sobe um servidor TCP na po
 
 ---
 
+## 🔄 Teste Cruzado: M5StickC vs M5Cardputer
+
+Você pode usar o M5StickC e o M5Cardputer rodando este firmware exato para testarem um ao outro diretamente:
+
+1.  **Conecte os Pinos da Porta Grove Cruzados**:
+    *   StickC **TX (G32)** com Cardputer **RX (G2)**.
+    *   StickC **RX (G33)** com Cardputer **TX (G1)**.
+    *   StickC **GND** com Cardputer **GND**.
+2.  **Inicie o Spammer no StickC**:
+    *   Acesse o modo **Spammer / Macros** no StickC.
+    *   Selecione a macro `Loopback Ping` (envia `"PING\n"` a cada 250ms).
+    *   Pressione o **Botão B** no StickC para iniciar a transmissão.
+3.  **Observe no Cardputer**:
+    *   Acesse o modo **Text Terminal** ou **Hex Viewer** no Cardputer.
+    *   Você verá `"PING"` sendo impresso na tela e o contador **RX** incrementando.
+4.  **Teste o Modo Echo**:
+    *   Segure o botão **G0** no Cardputer para ativar o **ECHO ON**.
+    *   Observe a tela do StickC: o contador **RX** do StickC começará a subir rapidamente à medida que o Cardputer rebate de volta os pacotes de ping recebidos!
+
+Este setup valida 100% das funcionalidades: transmissão TX, processamento da fila RX, negociação de baud rates, contadores de estatísticas e lógica de atualização da tela.
+
+---
+
 ## 🛠️ Como Compilar e Gravar
 
-O projeto é voltado à família **ESP32**. Todas as bibliotecas externas necessárias são baixadas via ESP Component Manager.
+O projeto suporta a família **ESP32** (para M5StickC/Plus/Plus2) e **ESP32-S3** (para M5Cardputer). Todas as dependências externas são gerenciadas automaticamente pelo ESP Component Manager.
 
 1. Abra o terminal na pasta raiz do repositório.
 2. Ative o ambiente do ESP-IDF:
    ```bash
    . $HOME/esp/esp-idf/export.sh
    ```
-3. Defina o hardware alvo (ex: `esp32` ou `esp32s3`):
-   ```bash
-   idf.py set-target esp32
-   ```
+3. Defina o hardware alvo:
+   *   Para **M5StickC Plus2**: `idf.py set-target esp32` (ou `esp32s3` dependendo do variante).
+   *   Para **M5Cardputer**: `idf.py set-target esp32s3`.
 4. Compile o projeto:
    ```bash
    idf.py build
    ```
-5. Grave o firmware e execute o monitor de logs:
+5. Grave o firmware:
    ```bash
    idf.py -p /dev/ttyACM0 flash monitor
    ```
