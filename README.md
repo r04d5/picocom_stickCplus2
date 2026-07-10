@@ -114,9 +114,9 @@ Automates periodic transmissions of preconfigured macros.
 *   **Use Case**: Stop bootloaders (e.g. U-Boot) instantly on startup to access recovery shells or test device response to recurring AT/Modbus requests.
 
 ### 5. Wi-Fi Bridge (Wireless Sniffer)
-Spins up a local Wi-Fi Access Point (`M5-UART-Bridge`) and binds a TCP server to port `8080`.
-*   **Use Case**: 
-    1.  Connect your laptop to the Wi-Fi network `M5-UART-Bridge`.
+Spins up a local **WPA2-protected** Wi-Fi Access Point (`M5-UART-Bridge`, password `m5uartbridge`) and binds a TCP server to port `8080`. The AP is encrypted and limited to a single client so a bystander cannot silently join and inject into the target's UART; change the password in `wifi_bridge.cpp` for your own deployments. The SSID and password are shown on the device screen.
+*   **Use Case**:
+    1.  Connect your laptop to the Wi-Fi network `M5-UART-Bridge` (password `m5uartbridge`).
     2.  Open a terminal on your laptop and run:
         ```bash
         nc 192.168.4.1 8080

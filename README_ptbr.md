@@ -114,9 +114,9 @@ Automatiza o envio periódico de comandos e macros estruturadas pela serial.
 *   **Caso de Uso**: Interrompe loops de boot (como U-Boot) ou testa comportamento de repetidores e consoles seriais.
 
 ### 5. Wi-Fi Bridge (Ponte Sem Fio / Tunnel)
-Cria um Access Point local chamado `M5-UART-Bridge` e sobe um servidor TCP na porta `8080`.
+Cria um Access Point local **protegido por WPA2** (`M5-UART-Bridge`, senha `m5uartbridge`) e sobe um servidor TCP na porta `8080`. O AP é criptografado e limitado a um único cliente para que um estranho não possa entrar silenciosamente e injetar dados no UART do alvo; troque a senha em `wifi_bridge.cpp` nos seus deployments. O SSID e a senha são exibidos na tela do dispositivo.
 *   **Caso de Uso**:
-    1.  Conecte o seu computador à rede Wi-Fi `M5-UART-Bridge`.
+    1.  Conecte o seu computador à rede Wi-Fi `M5-UART-Bridge` (senha `m5uartbridge`).
     2.  Abra um terminal no computador e execute o comando:
         ```bash
         nc 192.168.4.1 8080

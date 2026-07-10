@@ -280,12 +280,17 @@ void draw_terminal() {
         M5.Display.setTextSize(1);
         
         M5.Display.setTextColor(M5.Display.color565(147, 197, 253)); // Soft blue
-        M5.Display.drawString("WI-FI TRANSPARENT BRIDGE", 12, 38);
-        
+        M5.Display.drawString("WI-FI BRIDGE (WPA2)", 12, 38);
+
         M5.Display.setTextColor(WHITE);
-        M5.Display.drawString("SSID: M5-UART-Bridge", 12, 53);
-        M5.Display.drawString("TCP:  192.168.4.1:8080", 12, 68);
-        
+        char ssid_line[40];
+        snprintf(ssid_line, sizeof(ssid_line), "SSID: %s", BRIDGE_AP_SSID);
+        M5.Display.drawString(ssid_line, 12, 51);
+        char pass_line[40];
+        snprintf(pass_line, sizeof(pass_line), "PASS: %s", BRIDGE_AP_PASSWORD);
+        M5.Display.drawString(pass_line, 12, 64);
+        M5.Display.drawString("TCP:  192.168.4.1:8080", 12, 77);
+
         // Client Connection Status
         M5.Display.drawString("Client:", 12, 88);
         if (client_connected) {

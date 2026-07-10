@@ -21,6 +21,9 @@ bool wifi_bridge_running = false;
 bool client_connected = false;
 char client_ip_str[16] = "0.0.0.0";
 
+const char* BRIDGE_AP_SSID = "M5-UART-Bridge";
+const char* BRIDGE_AP_PASSWORD = "m5uartbridge"; // WPA2-PSK, must be >= 8 chars
+
 static TaskHandle_t bridge_task_handle = NULL;
 static int server_socket = -1;
 static int client_socket = -1;
@@ -155,15 +158,19 @@ void start_wifi_bridge() {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
 
     wifi_config_t wifi_config = {};
-    strcpy((char*)wifi_config.ap.ssid, "M5-UART-Bridge");
-    wifi_config.ap.ssid_len = strlen("M5-UART-Bridge");
-    wifi_config.ap.max_connection = 4;
-    wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+    strncpy((char*)wifi_config.ap.ssid, BRIDGE_AP_SSID, sizeof(wifi_config.ap.ssid) - 1);
+    wifi_config.ap.ssid_len = strlen(BRIDGE_AP_SSID);
+    strncpy((char*)wifi_config.ap.password, BRIDGE_AP_PASSWORD, sizeof(wifi_config.ap.password) - 1);
+    // Only one client is ever bridged; limiting connections shrinks the surface.
+    wifi_config.ap.max_connection = 1;
+    // WPA2-PSK unless the configured password is too short to be valid.
+    wifi_config.ap.authmode = (strlen(BRIDGE_AP_PASSWORD) >= 8) ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN;
 
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    printf("[WIFI-B] Access Point M5-UART-Bridge started\n");
+    printf("[WIFI-B] Access Point %s started (%s)\n", BRIDGE_AP_SSID,
+           wifi_config.ap.authmode == WIFI_AUTH_OPEN ? "OPEN" : "WPA2-PSK");
 
     wifi_bridge_running = true;
     xTaskCreate(wifi_bridge_task, "wifi_bridge_task", 4096, NULL, 5, &bridge_task_handle);
