@@ -135,6 +135,23 @@ Automatically inspects the RX stream as it flows, turning manual reconnaissance 
 *   **Reset (StickC)**: hold **Button A** to clear all counters.
 *   **Use Case**: leave the scanner running during the target's boot — if a root shell, a Wi-Fi password, or a private key shows up in the log, the matching counter lights up immediately, without you reading the whole dump. A live `Resp:` indicator also appears on the Spammer screen to correlate each sent macro with the reply received.
 
+### 7. Parser Fuzzer
+Sends deliberately malformed payloads to the target and watches the RX line for liveness — the practical form of Phase 3 in the audit methodology. A parser that was answering and then goes silent under malformed input is a strong signal of a buffer overflow / hang / DoS (guide §8.3, §8.7, §8.8).
+
+*   **Select Next**: Cycles the fuzz case:
+    1.  `NMEA field overflow`: a `$GPGGA,` sentence with a 220-byte field (fixed-buffer probe).
+    2.  `AT command overflow`: `AT` followed by 200 bytes (line-buffer probe).
+    3.  `NMEA bad checksum`: a well-formed sentence with a wrong `*XX` (does the target act on it anyway?).
+    4.  `Ctrl-byte flood`: `0x00 0x11 0x13 0xFF` repeated (NUL + XON/XOFF flow-control abuse).
+    5.  `Delimiter storm`: repeated framing chars with empty fields.
+    6.  `Modbus broken frame`: a frame claiming a huge byte count, truncated, with a bad CRC.
+*   **Confirm/Action**: Start / Stop fuzzing the selected case (every 250 ms).
+*   **Target health**: derived from RX activity — `RESPONSIVE` (green), `SILENT...` (yellow, brief gap) or `HANG/DoS!` (red: the target replied earlier and has now been silent for over 5 s under fuzzing). `no reply yet` means the target never spoke, so the result is inconclusive.
+*   **Reset (StickC)**: hold **Button A** to clear counters and the liveness baseline.
+
+> [!WARNING]
+> Fuzzing can crash or corrupt the target device. Only use it on hardware you own or are authorized to test.
+
 ---
 
 ## 🔄 Cross-Testing: M5StickC vs M5Cardputer

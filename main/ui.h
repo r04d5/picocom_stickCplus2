@@ -10,7 +10,8 @@ enum DeviceMode {
     MODE_AUTO_BAUD,
     MODE_SPAMMER,
     MODE_WIFI_BRIDGE,
-    MODE_SCANNER
+    MODE_SCANNER,
+    MODE_FUZZER
 };
 extern DeviceMode current_mode;
 

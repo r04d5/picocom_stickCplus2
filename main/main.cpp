@@ -6,6 +6,7 @@
 #include "wifi_bridge.h"
 #include "scanner.h"
 #include "proto_analyzer.h"
+#include "fuzzer.h"
 #include "ui.h"
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
@@ -119,7 +120,10 @@ extern "C" void app_main() {
                 if (current_mode == MODE_WIFI_BRIDGE) {
                     start_wifi_bridge();
                 }
-                
+                if (current_mode == MODE_FUZZER) {
+                    fuzzer_reset();
+                }
+
                 draw_dashboard_static();
                 draw_dashboard_dynamic();
                 draw_terminal();
@@ -145,6 +149,9 @@ extern "C" void app_main() {
                 } else if (current_mode == MODE_SPAMMER) {
                     selected_macro_idx = (selected_macro_idx + 1) % MACRO_COUNT;
                     terminal_dirty = true;
+                } else if (current_mode == MODE_FUZZER) {
+                    fuzz_case_idx = (fuzz_case_idx + 1) % FUZZ_CASE_COUNT;
+                    terminal_dirty = true;
                 } else {
                     baud_idx = (baud_idx + 1) % 8; // We have 8 standard rates
                     current_baud = baud_rates[baud_idx];
@@ -152,7 +159,7 @@ extern "C" void app_main() {
                     draw_dashboard_dynamic();
                 }
             } else if (!is_cardputer && M5.BtnA.wasHold()) {
-                if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
+                if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER && current_mode != MODE_FUZZER) {
                     // Press and hold (BtnA on StickC only): Full reset of active screen and counters
                     clear_terminal_buffers();
                     scanner_reset();
@@ -188,12 +195,19 @@ extern "C" void app_main() {
                 } else if (current_mode == MODE_SPAMMER) {
                     spammer_active = !spammer_active;
                     terminal_dirty = true;
+                } else if (current_mode == MODE_FUZZER) {
+                    if (!fuzzer_active) {
+                        fuzzer_start();
+                    } else {
+                        fuzzer_stop();
+                    }
+                    terminal_dirty = true;
                 } else {
                     echo_mode = !echo_mode;
                     draw_dashboard_dynamic();
                 }
             } else if (test_packet_pressed) {
-                if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER) {
+                if (current_mode != MODE_AUTO_BAUD && current_mode != MODE_SPAMMER && current_mode != MODE_FUZZER) {
                     // Press and hold (BtnB on StickC only): Sends a test packet over serial
                     const char *test_msg = "\r\n[StickC-Plus2 UART Test Packet]\r\n";
                     int len = strlen(test_msg);
@@ -210,6 +224,18 @@ extern "C" void app_main() {
             run_spammer_tick();
             if (spam_sent_count != prev_sent) {
                 terminal_dirty = true;
+            }
+        }
+
+        // Execute Fuzzer tick logic and refresh on health/counter changes
+        if (!in_menu && current_mode == MODE_FUZZER) {
+            static int prev_health = -1;
+            uint32_t prev_sent = fuzz_sent_count;
+            run_fuzzer_tick();
+            int h = fuzzer_health();
+            if (fuzz_sent_count != prev_sent || h != prev_health) {
+                terminal_dirty = true;
+                prev_health = h;
             }
         }
 
@@ -251,6 +277,8 @@ extern "C" void app_main() {
             // The drained burst marks an inter-frame idle boundary for the
             // binary (Modbus) analyzer.
             proto_frame_boundary();
+            // Note RX liveness for the fuzzer's target-health detection.
+            fuzzer_note_rx(xTaskGetTickCount() * portTICK_PERIOD_MS);
             if (!in_menu) {
                 terminal_dirty = true;
             }

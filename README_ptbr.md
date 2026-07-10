@@ -135,6 +135,23 @@ Analisa **automaticamente** o fluxo RX enquanto ele passa, transformando o recon
 *   **Reset (StickC)**: segure **Button A** para zerar todos os contadores.
 *   **Caso de Uso**: deixe o scanner rodando durante o boot do alvo — se um shell root, uma senha de Wi-Fi ou uma chave privada aparecer no log, o contador correspondente acende na hora, sem você precisar ler o dump inteiro. Um indicador `Resp:` ao vivo também aparece na tela do Spammer para correlacionar cada macro enviado com a resposta recebida.
 
+### 7. Parser Fuzzer (Fuzzer de Protocolo)
+Envia payloads deliberadamente malformados ao alvo e observa a vivacidade da linha RX — a forma prática da Fase 3 da metodologia de auditoria. Um parser que estava respondendo e fica em silêncio sob entrada malformada é forte indício de buffer overflow / travamento / DoS (guia §8.3, §8.7, §8.8).
+
+*   **Ciclar / Próximo**: Alterna o caso de fuzz:
+    1.  `NMEA field overflow`: sentença `$GPGGA,` com um campo de 220 bytes (teste de buffer fixo).
+    2.  `AT command overflow`: `AT` seguido de 200 bytes (teste de buffer de linha).
+    3.  `NMEA bad checksum`: sentença bem-formada com `*XX` errado (o alvo age mesmo assim?).
+    4.  `Ctrl-byte flood`: `0x00 0x11 0x13 0xFF` repetidos (NUL + abuso de controle de fluxo XON/XOFF).
+    5.  `Delimiter storm`: caracteres de framing repetidos com campos vazios.
+    6.  `Modbus broken frame`: frame declarando byte count enorme, truncado, com CRC inválido.
+*   **Confirmar / Ação**: Inicia / Para o fuzzing do caso selecionado (a cada 250 ms).
+*   **Saúde do alvo**: derivada da atividade RX — `RESPONSIVE` (verde), `SILENT...` (amarelo, pausa breve) ou `HANG/DoS!` (vermelho: o alvo respondia antes e está em silêncio há mais de 5 s sob fuzzing). `no reply yet` significa que o alvo nunca falou, então o resultado é inconclusivo.
+*   **Reset (StickC)**: segure **Button A** para zerar contadores e a linha de base de vivacidade.
+
+> [!WARNING]
+> O fuzzing pode travar ou corromper o dispositivo alvo. Use apenas em hardware que você possui ou tem autorização para testar.
+
 ---
 
 ## 🔄 Teste Cruzado: M5StickC vs M5Cardputer

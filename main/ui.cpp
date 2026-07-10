@@ -7,6 +7,7 @@
 #include "wifi_bridge.h"
 #include "scanner.h"
 #include "proto_analyzer.h"
+#include "fuzzer.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -19,14 +20,15 @@ DeviceMode current_mode = MODE_TEXT_TERMINAL;
 
 bool in_menu = true;
 int menu_selection = 0;
-const int MENU_ITEMS_COUNT = 6;
+const int MENU_ITEMS_COUNT = 7;
 const char* menu_items[] = {
     "1. Text Terminal",
     "2. Hex Viewer",
     "3. Auto-Baudrate",
     "4. Spammer / Macros",
     "5. Wi-Fi Bridge",
-    "6. Security Scanner"
+    "6. Security Scanner",
+    "7. Parser Fuzzer"
 };
 
 void draw_dashboard_static() {
@@ -57,6 +59,9 @@ void draw_dashboard_static() {
                 break;
             case MODE_SCANNER:
                 M5.Display.drawString("SECSCAN", 6, 1);
+                break;
+            case MODE_FUZZER:
+                M5.Display.drawString("FUZZER", 6, 1);
                 break;
         }
     }
@@ -331,6 +336,49 @@ void draw_terminal() {
             M5.Display.setTextColor(bad ? RED : GREEN);
             M5.Display.drawString(pd, 6, 118);
         }
+    } else if (current_mode == MODE_FUZZER) {
+        // Draw Parser Fuzzer UI
+        M5.Display.setFont(&fonts::Font0);
+        M5.Display.setTextSize(1);
+
+        // List fuzz cases with a selector
+        for (int i = 0; i < FUZZ_CASE_COUNT; i++) {
+            int y_pos = 35 + i * 10;
+            if (i == fuzz_case_idx) {
+                M5.Display.setTextColor(YELLOW);
+                M5.Display.drawString(">", 6, y_pos);
+                M5.Display.drawString(fuzz_case_name(i), 16, y_pos);
+            } else {
+                M5.Display.setTextColor(M5.Display.color565(156, 163, 175));
+                M5.Display.drawString(fuzz_case_name(i), 16, y_pos);
+            }
+        }
+
+        M5.Display.drawFastHLine(6, 96, 228, M5.Display.color565(71, 85, 105));
+
+        // Status + sent counter
+        M5.Display.setTextColor(WHITE);
+        M5.Display.drawString(fuzzer_active ? "FUZZING" : "IDLE", 6, 100);
+        char fsent[24];
+        snprintf(fsent, sizeof(fsent), "Sent: %u", (unsigned int)fuzz_sent_count);
+        M5.Display.setTextColor(CYAN);
+        M5.Display.drawString(fsent, 70, 100);
+
+        // Target health indicator -- the actual finding
+        int h = fuzzer_health();
+        const char* htxt;
+        uint16_t hcol;
+        switch (h) {
+            case FZ_RESPONSIVE: htxt = "TARGET: RESPONSIVE"; hcol = GREEN; break;
+            case FZ_SILENT:     htxt = "TARGET: SILENT...";  hcol = YELLOW; break;
+            case FZ_HANG:       htxt = "TARGET: HANG/DoS!";  hcol = RED; break;
+            default:            htxt = "TARGET: no reply yet"; hcol = M5.Display.color565(156, 163, 175); break;
+        }
+        M5.Display.setTextColor(hcol);
+        M5.Display.drawString(htxt, 6, 112);
+
+        M5.Display.setTextColor(M5.Display.color565(147, 197, 253));
+        M5.Display.drawString(is_cardputer() ? "G0:Case Hold:Run Dbl:Menu" : "A:Case B:Run Dbl-B:Menu", 6, 124);
     } else {
         M5.Display.setTextColor(RED);
         M5.Display.drawString("Mode not implemented yet.", 12, 45);
@@ -345,10 +393,10 @@ void draw_menu() {
     M5.Display.setTextSize(1);
     
     for (int i = 0; i < MENU_ITEMS_COUNT; i++) {
-        int y_pos = 35 + i * 16; // Spacing of 16 pixels to fit all items
+        int y_pos = 34 + i * 14; // Spacing of 14 pixels to fit all items
         if (i == menu_selection) {
             // Selected item: Indigo background, white text
-            M5.Display.fillRect(6, y_pos - 1, 228, 15, M5.Display.color565(79, 70, 229));
+            M5.Display.fillRect(6, y_pos - 1, 228, 13, M5.Display.color565(79, 70, 229));
             M5.Display.setTextColor(WHITE);
         } else {
             // Non-selected item: light gray text
